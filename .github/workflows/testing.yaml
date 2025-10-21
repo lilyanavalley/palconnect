@@ -1,0 +1,22 @@
+name: Run Rust Tests
+
+on:
+  push:
+    branches:
+      - live
+      - canary
+    tags:
+      - v/**
+  pull_request:
+    types:
+      - opened
+
+jobs:
+  testing:
+    strategy:
+      matrix:
+        os: [ubuntu-latest,macos-latest,windows-latest]
+
+    runs-on: ${{matrix.os}}
+    steps:
+      - run: cargo test
