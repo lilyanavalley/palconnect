@@ -1,0 +1,36 @@
+name: Build
+
+on:  
+  workflow_call:
+  push:
+    branches:
+      - live
+
+jobs:
+
+  testing:
+    uses: ./.github/workflows/testing.yaml
+  
+  building:
+    needs: testing
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      
+      - uses: actions/checkout@v4
+
+      - run: rustup toolchain install stable
+
+      - name: Install build dependencies
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt install -y pkg-config
+          fi 
+        shell: bash
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo build --release
+

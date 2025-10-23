@@ -1,6 +1,7 @@
 name: Run Rust Tests
 
 on:
+  workflow_call:
   push:
     branches:
       - live
