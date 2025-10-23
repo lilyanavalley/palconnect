@@ -12,7 +12,7 @@ COPY . .
 RUN cargo install --path .
 
 # Run steps
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends libssl3 openssl ca-certificates \
