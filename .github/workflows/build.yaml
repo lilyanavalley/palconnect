@@ -2,6 +2,19 @@ name: Build
 
 on:  
   workflow_call:
+    inputs:
+      enable_signing:
+        description: 'Enable package signing'
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      PACKAGER_PRIVATE_KEY:
+        description: 'Private key for signing packages'
+        required: false
+      PACKAGER_PRIVATE_KEY_PASSWORD:
+        description: 'Password for the private key'
+        required: false
     outputs:
       artifacts:
         description: "Build artifacts information"
@@ -53,10 +66,39 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: cargo build --release
+      - name: Check signing availability
+        id: check-signing
+        if: ${{ inputs.enable_signing }}
+        env:
+          PACKAGER_PRIVATE_KEY: ${{ secrets.PACKAGER_PRIVATE_KEY }}
+        run: |
+          if [ -n "$PACKAGER_PRIVATE_KEY" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "$PACKAGER_PRIVATE_KEY" > /tmp/packager_key.key
+            chmod 600 /tmp/packager_key.key
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
 
-      - name: Package application
+      - name: Package application (with signing)
+        if: ${{ inputs.enable_signing && steps.check-signing.outputs.available == 'true' }}
+        env:
+          PACKAGER_PRIVATE_KEY_PASSWORD: ${{ secrets.PACKAGER_PRIVATE_KEY_PASSWORD }}
+        run: |
+          cargo packager --release --formats ${{ matrix.artifact_suffix }} \
+            -k /tmp/packager_key.key \
+            --password "$PACKAGER_PRIVATE_KEY_PASSWORD"
+
+      - name: Package application (without signing)
+        if: ${{ !inputs.enable_signing || steps.check-signing.outputs.available != 'true' }}
         run: cargo packager --release --formats ${{ matrix.artifact_suffix }}
+
+      - name: Clean up signing key
+        if: ${{ inputs.enable_signing && always() }}
+        run: |
+          rm -f /tmp/packager_key.key
+        shell: bash
 
       - name: Set build info
         id: build-info

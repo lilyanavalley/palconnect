@@ -9,6 +9,11 @@ jobs:
 
   build:
     uses: ./.github/workflows/build.yaml
+    with:
+      enable_signing: true
+    secrets:
+      PACKAGER_PRIVATE_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
+      PACKAGER_PRIVATE_KEY_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
 
   create-release:
     needs: build
@@ -111,6 +116,42 @@ jobs:
           asset_name: ${{ matrix.asset-name }}
           asset_content_type: ${{ matrix.content-type }}
 
+      - name: Find signature file
+        id: find-signature
+        run: |
+          # Find the corresponding signature file
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            SIG_FILE=$(find ./artifacts -name "*.deb.sig" | head -1)
+            SIG_NAME="palconnect-linux-x86_64.deb.sig"
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            SIG_FILE=$(find ./artifacts -name "*.dmg.sig" | head -1)
+            SIG_NAME="palconnect-macos-x86_64.dmg.sig"
+          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+            SIG_FILE=$(find ./artifacts -name "*.msi.sig" | head -1)
+            SIG_NAME="palconnect-windows-x86_64.msi.sig"
+          fi
+          
+          if [ -n "$SIG_FILE" ] && [ -f "$SIG_FILE" ]; then
+            echo "signature-path=$SIG_FILE" >> $GITHUB_OUTPUT
+            echo "signature-name=$SIG_NAME" >> $GITHUB_OUTPUT
+            echo "has-signature=true" >> $GITHUB_OUTPUT
+            echo "Found signature: $SIG_FILE -> $SIG_NAME"
+          else
+            echo "has-signature=false" >> $GITHUB_OUTPUT
+            echo "No signature file found"
+          fi
+
+      - name: Upload Signature File
+        if: ${{ steps.find-signature.outputs.has-signature == 'true' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload-url }}
+          asset_path: ${{ steps.find-signature.outputs.signature-path }}
+          asset_name: ${{ steps.find-signature.outputs.signature-name }}
+          asset_content_type: application/octet-stream
+
   update-cargo-packager-config:
     needs: [create-release, upload-artifacts]
     runs-on: ubuntu-latest
@@ -123,6 +164,39 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Download all artifacts to extract signatures
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Extract signatures from artifacts
+        id: extract-signatures
+        run: |
+          # Initialize signature variables
+          LINUX_SIG=""
+          DARWIN_SIG=""  
+          WINDOWS_SIG=""
+          
+          # Extract Linux signature
+          if [ -f "./artifacts/palconnect-ubuntu-latest-${{ github.sha }}/palconnect.deb.sig" ]; then
+            LINUX_SIG=$(base64 -w 0 "./artifacts/palconnect-ubuntu-latest-${{ github.sha }}/palconnect.deb.sig")
+          fi
+          
+          # Extract macOS signature  
+          if [ -f "./artifacts/palconnect-macos-latest-${{ github.sha }}/palconnect.dmg.sig" ]; then
+            DARWIN_SIG=$(base64 -w 0 "./artifacts/palconnect-macos-latest-${{ github.sha }}/palconnect.dmg.sig")
+          fi
+          
+          # Extract Windows signature
+          if [ -f "./artifacts/palconnect-windows-latest-${{ github.sha }}/palconnect.msi.sig" ]; then
+            WINDOWS_SIG=$(base64 -w 0 "./artifacts/palconnect-windows-latest-${{ github.sha }}/palconnect.msi.sig")
+          fi
+          
+          # Output signatures for next step
+          echo "linux_signature=$LINUX_SIG" >> $GITHUB_OUTPUT
+          echo "darwin_signature=$DARWIN_SIG" >> $GITHUB_OUTPUT
+          echo "windows_signature=$WINDOWS_SIG" >> $GITHUB_OUTPUT
+
       - name: Update updater configuration
         run: |
           # Create or update updater config for cargo-packager-updater
@@ -134,15 +208,15 @@ jobs:
             "pub_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
             "platforms": {
               "linux-x86_64": {
-                "signature": "",
+                "signature": "${{ steps.extract-signatures.outputs.linux_signature }}",
                 "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-linux-x86_64.deb"
               },
               "darwin-x86_64": {
-                "signature": "",
+                "signature": "${{ steps.extract-signatures.outputs.darwin_signature }}",
                 "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-macos-x86_64.dmg"
               },
               "windows-x86_64": {
-                "signature": "",
+                "signature": "${{ steps.extract-signatures.outputs.windows_signature }}",
                 "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-windows-x86_64.msi"
               }
             }

@@ -12,6 +12,11 @@ on:
         required: false
         default: true
         type: boolean
+      enable_signing:
+        description: 'Enable package signing (requires signing keys in secrets)'
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   create-tag-and-release:

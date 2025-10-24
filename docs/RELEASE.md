@@ -45,13 +45,43 @@ Follow [Semantic Versioning](https://semver.org/):
 - **MINOR**: New features (backward compatible)
 - **PATCH**: Bug fixes (backward compatible)
 
+## Package Signing
+
+For security, releases are signed using `cargo-packager` signing functionality:
+
+### Setup Signing (One-time)
+
+1. **Generate signing keys**:
+
+   ```bash
+   cargo packager signer generate 
+   ```
+
+2. **Add to GitHub Secrets** (in repository Settings → Secrets):
+   - `CARGO_PACKAGER_SIGN_PRIVATE_KEY`: Contents of the generated private key file
+   - `CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD`: Password you used when generating the key
+
+3. **Test locally**:
+
+   ```bash
+   cargo packager --release
+   ```
+
+### How Signing Works
+
+- Packages (`.deb`, `.dmg`, `.msi`) are signed during build
+- Signature files (`.sig`) are generated alongside packages
+- Signatures are included in GitHub releases
+- Auto-updater verifies signatures before installing updates
+
 ## Auto-Updates
 
 The release system is configured to work with `cargo-packager-updater`:
 
-- Each release creates an updater configuration file
-- Clients can check for updates automatically
+- Each release creates an updater configuration file with cryptographic signatures
+- Clients automatically verify signatures before updating
 - Users get notified about new versions within the app
+- Updates are only installed if signatures are valid
 
 ## Files Created by Release Process
 

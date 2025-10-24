@@ -35,11 +35,3 @@ formats = [
     "wix", 
     "deb"
 ]
-
-[package.metadata.packager.updater]
-active = true
-endpoints = [
-    "https://github.com/lilyanavalley/palconnect/releases/latest/download/latest.json"
-]
-dialog = true
-with-elevated-task = false

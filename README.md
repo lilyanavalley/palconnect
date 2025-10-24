@@ -95,6 +95,38 @@ The bot currently uses these PalWorld REST API endpoints:
 - `GET /v1/api/players` - Get current players
 - `GET /v1/api/info` - Get server information
 
+## Releases & Distribution
+
+PalConnect uses automated GitHub Actions for building and releasing:
+
+### Installation
+
+Download the latest release for your platform:
+
+- **Windows**: `.msi` installer
+- **macOS**: `.dmg` package  
+- **Linux**: `.deb` package
+
+All releases are cryptographically signed for security.
+
+### Auto-Updates
+
+The application includes automatic update functionality via `cargo-packager-updater`:
+
+- Checks for updates on startup
+- Verifies cryptographic signatures before updating
+- Prompts user before installing updates
+
+### For Developers
+
+See [docs/RELEASE.md](docs/RELEASE.md) for complete release process documentation, including:
+
+- Setting up package signing
+- Creating releases
+- Understanding the build pipeline
+
+See [docs/SIGNING.md](docs/SIGNING.md) for documentation on release signing.
+
 ## Troubleshooting
 
 ### Common Issues

@@ -17,3 +17,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Signing keys (keep these secure!)
+/keys/
+*.key
+*.pem
+*.p12
+*.pfx
