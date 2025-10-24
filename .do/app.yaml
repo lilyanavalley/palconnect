@@ -1,35 +1,40 @@
-
 alerts:
-  - rule: DEPLOYMENT_FAILED
-  - rule: DOMAIN_FAILED
-
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
 features:
-  - buildpack-stack=ubuntu-22
-
+- buildpack-stack=ubuntu-22
+ingress: {}
 name: palconnect-prod
 region: tor
-
 services:
-  - dockerfile_path: /Dockerfile
-    envs:
-    - key: DISCORD_TOKEN
-      scope: RUN_TIME
-      type: SECRET
-    - key: PALWORLD_ADMIN_PASSWORD
-      scope: RUN_TIME
-      type: SECRET
-    - key: PALWORLD_API_URL
-      scope: RUN_TIME
-      type: GENERAL
-    http_port: 3000
-    image:
-      deploy_on_push:
-        enabled: true
-      registry: ghcr.io
-      registry_type: GHCR
-      repository: lilyanavalley/palconnect
-      tag: latest
-    instance_count: 1
-    instance_size_slug: apps-s-1vcpu-2gb
-    name: palconnect-prod
-    source_dir: /
+- dockerfile_path: /Dockerfile
+  envs:
+  - key: PALWORLD_API_URL
+    scope: RUN_TIME
+    value: palworld-u1:8212
+  - key: PALWORLD_ADMIN_PASSWORD
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:xUbjEKhr729u8ENPSD+7iLaxaKOhr083:DNqn6WBpp9mcmcesqtW/7kWfjOi9d5a6YfXcTaU=]
+  - key: DISCORD_TOKEN
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:NmgoUg9Qxpa8klrR54UOeR2dOpFsfCUw:DeudbnK8tJu5HW5miaz+o+1j5nggS3Q+evJt8+E19VzJ+RuDVKASxH0IoDp6c5EwquVFQsD8sfc5beEsk/EEU/8rDIiA2nYquA+lZb/jq6mT3f6Mi249mg==]
+  - key: UPDATE_ENABLE
+    scope: RUN_TIME
+    value: "false"
+  image:
+    deploy_on_push:
+      enabled: true
+    registry: ghcr.io
+    registry_type: GHCR
+    repository: lilyanavalley/palconnect
+    tag: latest
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-2gb
+  internal_ports:
+  - 3000
+  name: palconnect-prod
+  source_dir: /
+vpc:
+  id: 7dc6f737-ac99-48e2-8b11-b6edf0f959ec
