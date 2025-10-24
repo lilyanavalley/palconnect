@@ -45,6 +45,12 @@ jobs:
           fi 
         shell: bash
 
+      - name: Install binstall
+        run: curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+      
+      - name: Install cargo-packager
+        run: cargo binstall -y cargo-packager
+
       - uses: Swatinem/rust-cache@v2
 
       - run: cargo build --release
