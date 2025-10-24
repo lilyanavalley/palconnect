@@ -1,8 +1,14 @@
 
+use std::env;
+
 use poise::serenity_prelude as serenity;
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use reqwest::Client;
 use serde::Deserialize;
-use std::env;
+use tokio::signal;
+use tracing::{trace, debug, info, warn, error};
+mod health_check;
+use health_check::*;
 
 
 // Data structure that will be accessible in all command invocations
@@ -155,23 +161,25 @@ async fn help(ctx: Context<'_>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-  // Load environment variables from .env file
+
+  // * Initialize tracing
+  tracing_subscriber::fmt::init();
+
+  // * Load environment variables from .env file
   dotenv::dotenv().ok();
   
-  // Load environment variables
+  // * Load environment variables
   let discord_token = env::var("DISCORD_TOKEN")
     .expect("Expected DISCORD_TOKEN environment variable");
-  
   let palworld_api_url = env::var("PALWORLD_API_URL")
-    .unwrap_or_else(|_| "http://localhost:8212".to_string());
-  
+    .unwrap_or_else(|_| "http://localhost:8212".to_string());  
   let admin_password = env::var("PALWORLD_ADMIN_PASSWORD")
     .expect("Expected PALWORLD_ADMIN_PASSWORD environment variable");
+  info!("🚀 Starting PalConnect bot...");
+  info!("📡 PalWorld API URL: {}", palworld_api_url);
   
-  println!("🚀 Starting PalConnect bot...");
-  println!("📡 PalWorld API URL: {}", palworld_api_url);
-  
-  let framework = poise::Framework::builder()
+  // * Setup Discord bot
+  let framework_poise = poise::Framework::builder()
     .options(poise::FrameworkOptions {
       commands: vec![players(), serverinfo(), help()],
       ..Default::default()
@@ -190,20 +198,38 @@ async fn main() -> Result<(), Error> {
     })
     .build();
   
-  let intents = serenity::GatewayIntents::non_privileged();
-  let client = serenity::ClientBuilder::new(discord_token, intents)
-    .framework(framework)
-    .await;
+  let poise_intents = serenity::GatewayIntents::non_privileged();
+  let mut poise_client = serenity::ClientBuilder::new(discord_token, poise_intents)
+    .framework(framework_poise)
+    .await
+    .expect("Failed to create Discord client");
   
-  match client {
-    Ok(mut client) => {
-      println!("✅ Bot connected successfully!");
-      client.start().await?;
+  // * Setup Actix Web server
+  let actix_server = HttpServer::new(|| {
+    App::new()
+      .service(health_check)
+  })
+  .bind(("0.0.0.0", 3000))?
+  .run();
+
+  info!("✅ Starting both Discord bot and health check server...");
+  
+  // * Run both services concurrently with graceful shutdown
+  tokio::select! {
+    result = poise_client.start() => {
+      error!("Discord bot stopped: {:?}", result);
+      result?;
     }
-    Err(e) => {
-      eprintln!("❌ Failed to create client: {}", e);
+    result = actix_server => {
+      error!("Actix server stopped: {:?}", result);
+      result?;
+    }
+    _ = signal::ctrl_c() => {
+      info!("🛑 Received Ctrl+C, shutting down gracefully...");
     }
   }
   
+  info!("👋 Shutdown complete");
   Ok(())
+
 }
