@@ -161,7 +161,7 @@ async fn help(ctx: Context<'_>) -> Result<(), Error> {
     .field("/serverinfo", "Display server information", false)
     .field("/help", "Show this help message", false)
     .color(0x7289da)
-    .footer(serenity::CreateEmbedFooter::new("PalConnect Bot v0.1.0"));
+    .footer(serenity::CreateEmbedFooter::new(concat!("PalConnect Bot ", env!("CARGO_PKG_VERSION"))));
   
   ctx.send(poise::CreateReply::default().embed(embed)).await?;
   Ok(())
