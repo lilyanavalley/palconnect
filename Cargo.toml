@@ -1,7 +1,7 @@
 [package]
 name = "palconnect"
 authors = ["Lily Ana Valley <hi@lilyvalley.dev>"]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
@@ -11,6 +11,35 @@ reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 dotenv = "0.15"
+cargo-packager = { version = "0.11.7", default-features = false }
+cargo-packager-updater = "0.2.3"
 actix-web = "4.11"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+
+[package.metadata.packager]
+product-name = "PalConnect"
+name = "palconnect"
+description = "Community bridge between Discord and PalWorld"
+category = "Utility"
+homepage = "https://github.com/lilyanavalley/palconnect"
+identifier = "dev.lilyvalley.palconnect"
+copyright = "Lily Valley, 2025 under AGPL-3-or-later"
+license-file = "./COPYING.md"
+authors = ["Lily Ana Valley <hi@lilyvalley.dev>"]
+
+before-packaging-command = "cargo build --release"
+
+formats = [
+    "dmg",
+    "wix", 
+    "deb"
+]
+
+[package.metadata.packager.updater]
+active = true
+endpoints = [
+    "https://github.com/lilyanavalley/palconnect/releases/latest/download/latest.json"
+]
+dialog = true
+with-elevated-task = false

@@ -7,8 +7,16 @@ use reqwest::Client;
 use serde::Deserialize;
 use tokio::signal;
 use tracing::{trace, debug, info, warn, error};
+use cargo_packager;
+use cargo_packager_updater;
+
 mod health_check;
 use health_check::*;
+
+
+const UPDATE_ENDPOINT: &str = "https://github.com/lilyanavalley/palconnect/releases/download/updates";
+const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
+const UPDATE_ENABLE: &str = "false"; // * Default value
 
 
 // Data structure that will be accessible in all command invocations
@@ -175,6 +183,47 @@ async fn main() -> Result<(), Error> {
     .unwrap_or_else(|_| "http://localhost:8212".to_string());  
   let admin_password = env::var("PALWORLD_ADMIN_PASSWORD")
     .expect("Expected PALWORLD_ADMIN_PASSWORD environment variable");
+  let updates_auto_enable = <bool as std::str::FromStr>::from_str(
+    env::var(UPDATE_ENABLE)
+      .unwrap_or_else(|_| UPDATE_ENABLE.to_string())
+      .to_lowercase()
+      .as_str()
+  ).expect("Failed to parse UPDATES_AUTO_ENABLE as bool");
+
+  // * Check for updates and apply if available
+  if updates_auto_enable {
+    
+    info!("🔄 Autoupdate enabled, checking online for newer copy...");
+    info!("Current version number: {}", env!("CARGO_PKG_VERSION"));
+
+    let config = cargo_packager_updater::Config {
+      endpoints: vec![UPDATE_ENDPOINT.parse().unwrap()],
+      pubkey: UPDATE_PUBKEY.into(),
+      ..Default::default()
+    };
+  
+    if let Some(update) = cargo_packager_updater::check_update(
+        env!("CARGO_PKG_VERSION").parse().unwrap(),
+        config
+      ).expect("failed while checking for update")
+    {
+      info!("⬇️ Update found, downloading and installing...");
+      debug!("New version number: {}", update.version);
+      debug!("New version signature: {}", update.signature);
+      debug!("New version publish date: {:?}", update.date);
+      debug!("New version target: {}", update.target);
+      debug!("Update status: {:#?}", update.download_and_install()); // returns on error, restarts on success.
+    } else {
+      // there is no update
+      info!("✅ No updates found, continuing startup...");
+    }
+
+  }
+
+  if !updates_auto_enable {
+    info!("⏸️ Autoupdate disabled, skipping update check");
+  }
+
   info!("🚀 Starting PalConnect bot...");
   info!("📡 PalWorld API URL: {}", palworld_api_url);
   
