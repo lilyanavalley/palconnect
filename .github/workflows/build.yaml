@@ -37,7 +37,7 @@ jobs:
             artifact_suffix: dmg
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_suffix: msi
+            artifact_suffix: wix # UGGGGH why
     runs-on: ${{ matrix.os }}
     steps:
       
