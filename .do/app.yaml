@@ -11,7 +11,7 @@ services:
   envs:
   - key: PALWORLD_API_URL
     scope: RUN_TIME
-    value: palworld-u1:8212
+    value: http://10.118.0.9:8212
   - key: PALWORLD_ADMIN_PASSWORD
     scope: RUN_AND_BUILD_TIME
     type: SECRET
@@ -23,6 +23,12 @@ services:
   - key: UPDATE_ENABLE
     scope: RUN_TIME
     value: "false"
+  - key: RUST_LOG
+    scope: RUN_AND_BUILD_TIME
+    value: info
+  - key: RUST_BACKTRACE
+    scope: RUN_AND_BUILD_TIME
+    value: full
   image:
     deploy_on_push:
       enabled: true
