@@ -6,9 +6,15 @@ use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use reqwest::Client;
 use serde::Deserialize;
 use tokio::signal;
-use tracing::{trace, debug, info, warn, error};
 use cargo_packager;
 use cargo_packager_updater;
+use fork;
+use log::{debug, error, info, trace, warn};
+use fern;
+use syslog;
+use clap::Parser;
+use std::fs;
+use std::io::Write;
 
 mod health_check;
 use health_check::*;
@@ -17,6 +23,16 @@ use health_check::*;
 const UPDATE_ENDPOINT: &str = "https://github.com/lilyanavalley/palconnect/releases/download/updates";
 const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
 const UPDATE_ENABLE: &str = "false"; // * Default value
+
+#[derive(Parser)]
+#[command(name = "palconnect")]
+#[command(about = "A Discord bot for PalWorld server monitoring")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+struct Args {
+    /// Run as a daemon in the background
+    #[arg(short, long)]
+    daemon: bool,
+}
 
 
 // Data structure that will be accessible in all command invocations
@@ -170,9 +186,72 @@ async fn help(ctx: Context<'_>) -> Result<(), Error> {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
 
-  // * Initialize tracing
-  tracing_subscriber::fmt::init();
+  let args = Args::parse();
+  if args.daemon {
+    debug!("👹 daemonizing");
+    match fork::daemon(false, false) {
+      Ok(fork::Fork::Child) => {
+        // We are in the child process (daemon)
+        let pid = std::process::id();
+        info!("🔧 Daemon process started with PID: {}", pid);
+        
+        // Write PID file
+        if let Err(e) = write_pid_file(pid) {
+          warn!("⚠️ Failed to write PID file: {}", e);
+        }
+        
+        let result = dispatcher().await;
+        
+        // Clean up PID file on exit
+        if let Err(e) = remove_pid_file() {
+          warn!("⚠️ Failed to remove PID file: {}", e);
+        }
+        
+        result.expect("Failed to run dispatcher in daemon mode");
+      }
+      Ok(fork::Fork::Parent(_child_pid)) => {
+        // We are in the parent process - exit cleanly
+        info!("🚀 Daemon started successfully");
+      }
+      Err(e) => {
+        error!("❌ Failed to daemonize: {}", e);
+        return Err(format!("Failed to daemonize: {}", e).into());
+      }
+    }
+    return Ok(())
+  }
 
+  else {
+    return dispatcher().await
+  }
+
+}
+
+async fn dispatcher() -> Result<(), Error> {
+  
+  // * Initialize tracing (must be done in each process)
+  let syslog_formatter = syslog::Formatter3164 {
+    facility: syslog::Facility::LOG_USER,
+    hostname: None,
+    process: env!("CARGO_PKG_NAME").to_owned(),
+    pid: 0,
+  };
+  fern::Dispatch::new()
+    .format(|out, message, record| {
+      out.finish(format_args!(
+        "{} [{}]: {}",
+        record.level(),
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+        message
+      ))
+    })
+    .level(log::LevelFilter::Info)
+    .chain(std::io::stdout())
+    .chain(syslog::unix(syslog_formatter)?)
+    .chain(fern::log_file("log.txt")?)
+    .apply()
+    .expect("Failed to initialize logging");
+  
   // * Load environment variables from .env file
   dotenv::dotenv().ok();
   
@@ -202,21 +281,34 @@ async fn main() -> Result<(), Error> {
       ..Default::default()
     };
   
-    if let Some(update) = cargo_packager_updater::check_update(
+    match cargo_packager_updater::check_update(
         env!("CARGO_PKG_VERSION").parse().unwrap(),
         config
-      ).expect("failed while checking for update")
-    {
-      info!("⬇️ Update found, downloading and installing...");
-      debug!("New version number: {}", update.version);
-      debug!("New version signature: {}", update.signature);
-      debug!("New version publish date: {:?}", update.date);
-      debug!("New version target: {}", update.target);
-      debug!("Update status: {:#?}", update.download_and_install()); // returns on error, restarts on success.
-    } else {
-      // there is no update
-      info!("✅ No updates found, continuing startup...");
-    }
+      ) {
+        Ok(Some(update)) => {
+          info!("⬇️ Update found, downloading and installing...");
+          debug!("New version number: {}", update.version);
+          debug!("New version signature: {}", update.signature);
+          debug!("New version publish date: {:?}", update.date);
+          debug!("New version target: {}", update.target);
+          
+          match update.download_and_install() {
+            Ok(_) => {
+              info!("🔄 Update installed successfully, restarting...");
+              // This should restart the application
+            }
+            Err(e) => {
+              error!("🔺 Update installation failed: {}, continuing with current version", e);
+            }
+          }
+        }
+        Ok(None) => {
+          info!("✅ No updates found, continuing startup...");
+        }
+        Err(e) => {
+          error!("🔺 Failed to check for updates: {}, continuing startup", e);
+        }
+      }
 
   }
 
@@ -280,5 +372,21 @@ async fn main() -> Result<(), Error> {
   
   info!("👋 Shutdown complete");
   Ok(())
+}
 
+fn write_pid_file(pid: u32) -> std::io::Result<()> {
+  let pid_path = "/tmp/palconnect.pid";
+  let mut file = fs::File::create(pid_path)?;
+  writeln!(file, "{}", pid)?;
+  info!("📄 PID file written to {}", pid_path);
+  Ok(())
+}
+
+fn remove_pid_file() -> std::io::Result<()> {
+  let pid_path = "/tmp/palconnect.pid";
+  if std::path::Path::new(pid_path).exists() {
+    fs::remove_file(pid_path)?;
+    info!("🗑️ PID file removed");
+  }
+  Ok(())
 }

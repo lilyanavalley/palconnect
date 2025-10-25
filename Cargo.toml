@@ -1,7 +1,7 @@
 [package]
 name = "palconnect"
 authors = ["Lily Ana Valley <hi@lilyvalley.dev>"]
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 
 [dependencies]
@@ -14,8 +14,12 @@ dotenv = "0.15"
 cargo-packager = { version = "0.11.7", default-features = false }
 cargo-packager-updater = "0.2.3"
 actix-web = "4.11"
-tracing = "0.1"
-tracing-subscriber = "0.3"
+chrono = "0.4.42"
+log = "0.4.28"
+fern = { version = "0.7", features = ["syslog-7"] }
+syslog = "7.0.0"
+fork = "0.3.0"
+clap = { version = "4.0", features = ["derive"] }
 
 [package.metadata.packager]
 product-name = "PalConnect"
