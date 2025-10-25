@@ -2,25 +2,19 @@ name: Build
 
 on:  
   workflow_call:
-    inputs:
-      enable_signing:
-        description: 'Enable package signing'
-        required: false
-        default: false
-        type: boolean
     secrets:
-      PACKAGER_PRIVATE_KEY:
+      CARGO_PACKAGER_SIGN_PRIVATE_KEY:
         description: 'Private key for signing packages'
-        required: false
-      PACKAGER_PRIVATE_KEY_PASSWORD:
+        required: true
+      CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD:
         description: 'Password for the private key'
-        required: false
+        required: true
     outputs:
       artifacts:
         description: "Build artifacts information"
         value: ${{ jobs.building.outputs.artifacts }}
   push:
-    branches:
+    branches: # TODO: change to tag
       - live
 
 jobs:
@@ -43,7 +37,7 @@ jobs:
             artifact_suffix: dmg
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_suffix: wix
+            artifact_suffix: msi
     runs-on: ${{ matrix.os }}
     steps:
       
@@ -66,50 +60,23 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Check signing availability
-        id: check-signing
-        if: ${{ inputs.enable_signing }}
+      - name: Package application with sign
         env:
-          PACKAGER_PRIVATE_KEY: ${{ secrets.PACKAGER_PRIVATE_KEY }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
         run: |
-          if [ -n "$PACKAGER_PRIVATE_KEY" ]; then
-            echo "available=true" >> $GITHUB_OUTPUT
-            echo "$PACKAGER_PRIVATE_KEY" > /tmp/packager_key.key
-            chmod 600 /tmp/packager_key.key
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
-          fi
-        shell: bash
-
-      - name: Package application (with signing)
-        if: ${{ inputs.enable_signing && steps.check-signing.outputs.available == 'true' }}
-        env:
-          PACKAGER_PRIVATE_KEY_PASSWORD: ${{ secrets.PACKAGER_PRIVATE_KEY_PASSWORD }}
-        run: |
-          cargo packager --release --formats ${{ matrix.artifact_suffix }} \
-            -k /tmp/packager_key.key \
-            --password "$PACKAGER_PRIVATE_KEY_PASSWORD"
-
-      - name: Package application (without signing)
-        if: ${{ !inputs.enable_signing || steps.check-signing.outputs.available != 'true' }}
-        run: cargo packager --release --formats ${{ matrix.artifact_suffix }}
-
-      - name: Clean up signing key
-        if: ${{ inputs.enable_signing && always() }}
-        run: |
-          rm -f /tmp/packager_key.key
-        shell: bash
+          cargo packager --release --formats ${{ matrix.artifact_suffix }}
 
       - name: Set build info
         id: build-info
         run: |
-          echo "artifacts=target/release/dist" >> $GITHUB_OUTPUT
+          echo "artifacts=target/release/" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: palconnect-${{ matrix.os }}-${{ github.sha }}
-          path: target/release/dist/
+          path: target/release/
           retention-days: 30
 
