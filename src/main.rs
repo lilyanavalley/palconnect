@@ -8,9 +8,11 @@ use serde::Deserialize;
 use tokio::signal;
 use cargo_packager;
 use cargo_packager_updater;
+#[cfg(unix)]
 use fork;
 use log::{debug, error, info, trace, warn};
 use fern;
+#[cfg(unix)]
 use syslog;
 use clap::Parser;
 use std::fs;
@@ -29,7 +31,8 @@ const UPDATE_ENABLE: &str = "false"; // * Default value
 #[command(about = "A Discord bot for PalWorld server monitoring")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 struct Args {
-    /// Run as a daemon in the background
+    /// Run as a daemon in the background (Unix only)
+    #[cfg(unix)]
     #[arg(short, long)]
     daemon: bool,
 }
@@ -187,6 +190,8 @@ async fn help(ctx: Context<'_>) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
 
   let args = Args::parse();
+  
+  #[cfg(unix)]
   if args.daemon {
     debug!("👹 daemonizing");
     match fork::daemon(false, false) {
@@ -221,21 +226,12 @@ async fn main() -> Result<(), Error> {
     return Ok(())
   }
 
-  else {
-    return dispatcher().await
-  }
-
+  dispatcher().await
 }
 
 async fn dispatcher() -> Result<(), Error> {
   
-  // * Initialize tracing (must be done in each process)
-  let syslog_formatter = syslog::Formatter3164 {
-    facility: syslog::Facility::LOG_USER,
-    hostname: None,
-    process: env!("CARGO_PKG_NAME").to_owned(),
-    pid: 0,
-  };
+  // * Initialize logging (stdout and file on all platforms)
   fern::Dispatch::new()
     .format(|out, message, record| {
       out.finish(format_args!(
@@ -247,7 +243,6 @@ async fn dispatcher() -> Result<(), Error> {
     })
     .level(log::LevelFilter::Info)
     .chain(std::io::stdout())
-    .chain(syslog::unix(syslog_formatter)?)
     .chain(fern::log_file("log.txt")?)
     .apply()
     .expect("Failed to initialize logging");
@@ -374,6 +369,7 @@ async fn dispatcher() -> Result<(), Error> {
   Ok(())
 }
 
+#[cfg(unix)]
 fn write_pid_file(pid: u32) -> std::io::Result<()> {
   let pid_path = "/tmp/palconnect.pid";
   let mut file = fs::File::create(pid_path)?;
@@ -382,6 +378,7 @@ fn write_pid_file(pid: u32) -> std::io::Result<()> {
   Ok(())
 }
 
+#[cfg(unix)]
 fn remove_pid_file() -> std::io::Result<()> {
   let pid_path = "/tmp/palconnect.pid";
   if std::path::Path::new(pid_path).exists() {
