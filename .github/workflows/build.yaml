@@ -14,8 +14,8 @@ on:
         description: "Build artifacts information"
         value: ${{ jobs.building.outputs.artifacts }}
   push:
-    branches: # TODO: change to tag
-      - live
+    tags:
+      - v/*.*.*
 
 jobs:
 
