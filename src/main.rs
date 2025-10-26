@@ -1,13 +1,12 @@
 use std::env;
 
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, web};
-use cargo_packager;
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use cargo_packager_updater;
 use clap::Parser;
 use fern;
 #[cfg(unix)]
 use fork;
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use poise::serenity_prelude as serenity;
 use reqwest::Client;
 use serde::Deserialize;
