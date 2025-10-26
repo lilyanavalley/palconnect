@@ -73,10 +73,19 @@ jobs:
           echo "artifacts=target/release/" >> $GITHUB_OUTPUT
         shell: bash
 
+      - name: Verify artifact exists
+        run: |
+          ARTIFACT="target/release/*.${{ matrix.artifact_suffix }}"
+          if [ ! -f "$ARTIFACT" ]; then
+            echo "Artifact $ARTIFACT not found!"
+            exit 1
+          fi
+        shell: bash
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: palconnect-${{ matrix.os }}-${{ github.sha }}
-          path: target/release/
+          name: palconnect-${{ matrix.os }}-${{ matrix.artifact_suffix }}-${{ github.sha }}
+          path: target/release/*.${{ matrix.artifact_suffix || 'msi' }}
           retention-days: 30
 
