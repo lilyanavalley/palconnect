@@ -16,10 +16,12 @@ cargo-packager-updater = "0.2.3"
 actix-web = "4.11"
 chrono = "0.4.42"
 log = "0.4.28"
-fern = { version = "0.7", features = ["syslog-7"] }
+fern = "0.7"
+clap = { version = "4.0", features = ["derive"] }
+
+[target.'cfg(unix)'.dependencies]
 syslog = "7.0.0"
 fork = "0.3.0"
-clap = { version = "4.0", features = ["derive"] }
 
 [package.metadata.packager]
 product-name = "PalConnect"

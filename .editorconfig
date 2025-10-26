@@ -7,6 +7,6 @@ charset = utf-8
 
 [*.{rs,md,sh}]
 indent_style = space
-indent_size = 2
+indent_size = 4
 insert_final_newline = true
 
