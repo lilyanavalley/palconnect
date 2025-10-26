@@ -365,17 +365,17 @@ async fn dispatcher() -> Result<(), Error> {
 
     // * Run both services concurrently with graceful shutdown
     tokio::select! {
-      result = poise_client.start() => {
-        error!("Discord bot stopped: {:?}", result);
-        result?;
-      }
-      result = actix_server => {
-        error!("Actix server stopped: {:?}", result);
-        result?;
-      }
-      _ = signal::ctrl_c() => {
-        info!("🛑 Received Ctrl+C, shutting down gracefully...");
-      }
+        result = poise_client.start() => {
+            error!("Discord bot stopped: {:?}", result);
+            result?;
+        }
+        result = actix_server => {
+            error!("Actix server stopped: {:?}", result);
+            result?;
+        }
+        _ = signal::ctrl_c() => {
+            info!("🛑 Received Ctrl+C, shutting down gracefully...");
+        }
     }
 
     info!("👋 Shutdown complete");
