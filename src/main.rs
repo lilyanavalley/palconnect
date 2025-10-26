@@ -192,38 +192,40 @@ async fn main() -> Result<(), Error> {
   let args = Args::parse();
   
   #[cfg(unix)]
-  if args.daemon {
-    debug!("👹 daemonizing");
-    match fork::daemon(false, false) {
-      Ok(fork::Fork::Child) => {
-        // We are in the child process (daemon)
-        let pid = std::process::id();
-        info!("🔧 Daemon process started with PID: {}", pid);
-        
-        // Write PID file
-        if let Err(e) = write_pid_file(pid) {
-          warn!("⚠️ Failed to write PID file: {}", e);
+  {
+    if args.daemon {
+      debug!("👹 daemonizing");
+      match fork::daemon(false, false) {
+        Ok(fork::Fork::Child) => {
+          // We are in the child process (daemon)
+          let pid = std::process::id();
+          info!("🔧 Daemon process started with PID: {}", pid);
+          
+          // Write PID file
+          if let Err(e) = write_pid_file(pid) {
+            warn!("⚠️ Failed to write PID file: {}", e);
+          }
+          
+          let result = dispatcher().await;
+          
+          // Clean up PID file on exit
+          if let Err(e) = remove_pid_file() {
+            warn!("⚠️ Failed to remove PID file: {}", e);
+          }
+          
+          result.expect("Failed to run dispatcher in daemon mode");
         }
-        
-        let result = dispatcher().await;
-        
-        // Clean up PID file on exit
-        if let Err(e) = remove_pid_file() {
-          warn!("⚠️ Failed to remove PID file: {}", e);
+        Ok(fork::Fork::Parent(_child_pid)) => {
+          // We are in the parent process - exit cleanly
+          info!("🚀 Daemon started successfully");
         }
-        
-        result.expect("Failed to run dispatcher in daemon mode");
+        Err(e) => {
+          error!("❌ Failed to daemonize: {}", e);
+          return Err(format!("Failed to daemonize: {}", e).into());
+        }
       }
-      Ok(fork::Fork::Parent(_child_pid)) => {
-        // We are in the parent process - exit cleanly
-        info!("🚀 Daemon started successfully");
-      }
-      Err(e) => {
-        error!("❌ Failed to daemonize: {}", e);
-        return Err(format!("Failed to daemonize: {}", e).into());
-      }
+      return Ok(())
     }
-    return Ok(())
   }
 
   dispatcher().await
