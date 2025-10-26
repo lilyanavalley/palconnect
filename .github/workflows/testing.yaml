@@ -11,6 +11,8 @@ on:
   pull_request:
     types:
       - opened
+      - review_requested
+      - edited
 
 jobs:
   testing:
