@@ -61,10 +61,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
+          tag_name: v/${{ steps.version.outputs.VERSION }}
           release_name: PalConnect ${{ steps.version.outputs.VERSION }}
           body_path: release_notes.md
-          draft: false
+          draft: true
           prerelease: false
 
   upload-artifacts:

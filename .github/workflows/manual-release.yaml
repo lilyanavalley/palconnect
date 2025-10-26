@@ -28,10 +28,10 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git tag -a "v${{ github.event.inputs.version }}" -m "Release v${{ github.event.inputs.version }}"
-          git push origin "v${{ github.event.inputs.version }}"
+          git tag -a "v/${{ github.event.inputs.version }}" -m "Release v${{ github.event.inputs.version }}"
+          git push origin "v/${{ github.event.inputs.version }}"
 
       - name: Trigger publish workflow
         run: |
-          echo "Tag v${{ github.event.inputs.version }} created successfully!"
+          echo "Tag v/${{ github.event.inputs.version }} created successfully!"
           echo "The publish workflow will now be triggered automatically."
