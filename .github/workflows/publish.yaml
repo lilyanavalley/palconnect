@@ -16,9 +16,6 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
-    outputs:
-      release-id: ${{ steps.create-release.outputs.id }}
-      upload-url: ${{ steps.create-release.outputs.upload_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,132 +23,62 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Generate release notes
-        id: release-notes
-        run: |
-          cat > release_notes.md << EOF
-          # PalConnect ${{ steps.version.outputs.VERSION }}
-          
-          ## What's Changed
-          
-          This release includes:
-          - Latest Discord bot functionality for PalWorld server monitoring
-          - Health check endpoint for cloud deployment
-          - Cross-platform support (Windows, macOS, Linux)
-          
-          ## Installation
-          
-          Download the appropriate package for your system:
-          - **Windows**: Download the `.msi` file
-          - **macOS**: Download the `.dmg` file  
-          - **Linux**: Download the `.deb` file
-          
-          ## Auto-Updates
-          
-          This version supports automatic updates via cargo-packager-updater.
-          
-          **Full Changelog**: https://github.com/${{ github.repository }}/compare/v0.0.0...${{ steps.version.outputs.VERSION }}
-          EOF
-
-      - name: Create Release
-        id: create-release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v/${{ steps.version.outputs.VERSION }}
-          release_name: PalConnect ${{ steps.version.outputs.VERSION }}
-          body_path: release_notes.md
-          draft: true
-          prerelease: false
-
-  upload-artifacts:
-    needs: [build, create-release]
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact-name: palconnect-ubuntu-latest-${{ github.sha }}
-            asset-name: palconnect-linux-x86_64.deb
-            content-type: application/vnd.debian.binary-package
-          - os: macos-latest
-            artifact-name: palconnect-macos-latest-${{ github.sha }}
-            asset-name: palconnect-macos-x86_64.dmg
-            content-type: application/x-apple-diskimage
-          - os: windows-latest
-            artifact-name: palconnect-windows-latest-${{ github.sha }}
-            asset-name: palconnect-windows-x86_64.msi
-            content-type: application/x-msi
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.artifact-name }}
           path: ./artifacts
 
-      - name: Find package file
-        id: find-package
+      - name: Prepare release assets
         run: |
-          # Find the actual package file in the artifacts directory
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            FILE=$(find ./artifacts -name "*.deb" | head -1)
-          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            FILE=$(find ./artifacts -name "*.dmg" | head -1)
-          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-            FILE=$(find ./artifacts -name "*.msi" | head -1)
-          fi
-          echo "file-path=$FILE" >> $GITHUB_OUTPUT
-          echo "Found package: $FILE"
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload-url }}
-          asset_path: ${{ steps.find-package.outputs.file-path }}
-          asset_name: ${{ matrix.asset-name }}
-          asset_content_type: ${{ matrix.content-type }}
-
-      - name: Find signature file
-        id: find-signature
-        run: |
-          # Find the corresponding signature file
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            SIG_FILE=$(find ./artifacts -name "*.deb.sig" | head -1)
-            SIG_NAME="palconnect-linux-x86_64.deb.sig"
-          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            SIG_FILE=$(find ./artifacts -name "*.dmg.sig" | head -1)
-            SIG_NAME="palconnect-macos-x86_64.dmg.sig"
-          elif [ "${{ matrix.os }}" == "windows-latest" ]; then
-            SIG_FILE=$(find ./artifacts -name "*.msi.sig" | head -1)
-            SIG_NAME="palconnect-windows-x86_64.msi.sig"
-          fi
+          mkdir -p ./release-assets
           
-          if [ -n "$SIG_FILE" ] && [ -f "$SIG_FILE" ]; then
-            echo "signature-path=$SIG_FILE" >> $GITHUB_OUTPUT
-            echo "signature-name=$SIG_NAME" >> $GITHUB_OUTPUT
-            echo "has-signature=true" >> $GITHUB_OUTPUT
-            echo "Found signature: $SIG_FILE -> $SIG_NAME"
-          else
-            echo "has-signature=false" >> $GITHUB_OUTPUT
-            echo "No signature file found"
-          fi
+          # Find and rename package files
+          find ./artifacts -name "*.deb" -exec cp {} ./release-assets/palconnect-linux-x86_64.deb \;
+          find ./artifacts -name "*.dmg" -exec cp {} ./release-assets/palconnect-macos-x86_64.dmg \;
+          find ./artifacts -name "*.msi" -exec cp {} ./release-assets/palconnect-windows-x86_64.msi \;
+          
+          # Find and rename signature files (if they exist)
+          find ./artifacts -name "*.deb.sig" -exec cp {} ./release-assets/palconnect-linux-x86_64.deb.sig \; 2>/dev/null || true
+          find ./artifacts -name "*.dmg.sig" -exec cp {} ./release-assets/palconnect-macos-x86_64.dmg.sig \; 2>/dev/null || true
+          find ./artifacts -name "*.msi.sig" -exec cp {} ./release-assets/palconnect-windows-x86_64.msi.sig \; 2>/dev/null || true
+          
+          # List what we found
+          echo "Release assets prepared:"
+          ls -la ./release-assets/
 
-      - name: Upload Signature File
-        if: ${{ steps.find-signature.outputs.has-signature == 'true' }}
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ needs.create-release.outputs.upload-url }}
-          asset_path: ${{ steps.find-signature.outputs.signature-path }}
-          asset_name: ${{ steps.find-signature.outputs.signature-name }}
-          asset_content_type: application/octet-stream
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: PalConnect ${{ steps.version.outputs.VERSION }}
+          draft: true
+          prerelease: false
+          files: ./release-assets/*
+          body: |
+            # PalConnect ${{ steps.version.outputs.VERSION }}
+            
+            ## What's Changed
+            
+            This release includes:
+            - Latest Discord bot functionality for PalWorld server monitoring
+            - Health check endpoint for cloud deployment
+            - Cross-platform support (Windows, macOS, Linux)
+            
+            ## Installation
+            
+            Download the appropriate package for your system:
+            - **Windows**: Download the `.msi` file
+            - **macOS**: Download the `.dmg` file  
+            - **Linux**: Download the `.deb` file
+            
+            ## Auto-Updates
+            
+            This version supports automatic updates via cargo-packager-updater.
+            
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/v0.0.0...${{ steps.version.outputs.VERSION }}
 
   update-cargo-packager-config:
-    needs: [create-release, upload-artifacts]
+    needs: [create-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -176,18 +103,18 @@ jobs:
           WINDOWS_SIG=""
           
           # Extract Linux signature
-          if [ -f "./artifacts/palconnect-ubuntu-latest-${{ github.sha }}/palconnect.deb.sig" ]; then
-            LINUX_SIG=$(base64 -w 0 "./artifacts/palconnect-ubuntu-latest-${{ github.sha }}/palconnect.deb.sig")
+          if [ -f "./artifacts/palconnect-ubuntu-latest-deb-${{ github.sha }}/palconnect.deb.sig" ]; then
+            LINUX_SIG=$(base64 -w 0 "./artifacts/palconnect-ubuntu-latest-deb-${{ github.sha }}/palconnect.deb.sig")
           fi
           
           # Extract macOS signature  
-          if [ -f "./artifacts/palconnect-macos-latest-${{ github.sha }}/palconnect.dmg.sig" ]; then
-            DARWIN_SIG=$(base64 -w 0 "./artifacts/palconnect-macos-latest-${{ github.sha }}/palconnect.dmg.sig")
+          if [ -f "./artifacts/palconnect-macos-latest-dmg-${{ github.sha }}/palconnect.dmg.sig" ]; then
+            DARWIN_SIG=$(base64 -w 0 "./artifacts/palconnect-macos-latest-dmg-${{ github.sha }}/palconnect.dmg.sig")
           fi
           
           # Extract Windows signature
-          if [ -f "./artifacts/palconnect-windows-latest-${{ github.sha }}/palconnect.msi.sig" ]; then
-            WINDOWS_SIG=$(base64 -w 0 "./artifacts/palconnect-windows-latest-${{ github.sha }}/palconnect.msi.sig")
+          if [ -f "./artifacts/palconnect-windows-latest-msi-${{ github.sha }}/palconnect.msi.sig" ]; then
+            WINDOWS_SIG=$(base64 -w 0 "./artifacts/palconnect-windows-latest-msi-${{ github.sha }}/palconnect.msi.sig")
           fi
           
           # Output signatures for next step

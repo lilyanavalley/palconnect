@@ -37,7 +37,7 @@ jobs:
             artifact_suffix: dmg
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_suffix: wix # UGGGGH why
+            artifact_suffix: msi
     runs-on: ${{ matrix.os }}
     steps:
       
@@ -65,7 +65,12 @@ jobs:
           CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
           CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
         run: |
-          cargo packager --release --formats ${{ matrix.artifact_suffix }}
+          # * Workaround to handle MSI format with cargo-packager
+          if [ "${{ matrix.artifact_suffix }}" == "msi" ]; then
+            cargo packager --release --formats wix
+          else
+            cargo packager --release --formats ${{ matrix.artifact_suffix }}
+          fi
 
       - name: Set build info
         id: build-info
@@ -75,17 +80,19 @@ jobs:
 
       - name: Verify artifact exists
         run: |
-          ARTIFACT="target/release/*.${{ matrix.artifact_suffix }}"
-          if [ ! -f "$ARTIFACT" ]; then
-            echo "Artifact $ARTIFACT not found!"
+          ARTIFACTS=(target/release/*.${{ matrix.artifact_suffix }})
+          if [ ! -f "${ARTIFACTS[0]}" ]; then
+            echo "No artifacts found matching target/release/*.${{ matrix.artifact_suffix }}"
+            ls -la target/release/
             exit 1
           fi
+          echo "Found artifact: ${ARTIFACTS[0]}"
         shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: palconnect-${{ matrix.os }}-${{ matrix.artifact_suffix }}-${{ github.sha }}
-          path: target/release/*.${{ matrix.artifact_suffix || 'msi' }}
+          path: target/release/*.${{ matrix.artifact_suffix }}
           retention-days: 30
 
