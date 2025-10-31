@@ -158,4 +158,4 @@ jobs:
           git config --local user.name "GitHub Action"
           git add .updater/latest.json
           git commit -m "Update auto-updater config for v${{ steps.version.outputs.VERSION }}" || exit 0
-          git push
+          git push origin HEAD:live
