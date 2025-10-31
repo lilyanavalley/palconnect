@@ -16,6 +16,8 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -80,6 +82,8 @@ jobs:
   update-cargo-packager-config:
     needs: [create-release]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
