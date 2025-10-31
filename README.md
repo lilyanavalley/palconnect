@@ -109,6 +109,23 @@ Download the latest release for your platform:
 
 All releases are cryptographically signed for security.
 
+### Linux Server Deployment
+
+For Linux servers, PalConnect can be deployed as a systemd service:
+
+```bash
+# Quick installation
+sudo ./systemd/install.sh
+
+# Configure environment
+sudo nano /etc/palconnect/palconnect.env
+
+# Start service
+sudo systemctl start palconnect
+```
+
+See [systemd/README.md](systemd/README.md) for complete systemd deployment documentation.
+
 ### Auto-Updates
 
 The application includes automatic update functionality via `cargo-packager-updater`:

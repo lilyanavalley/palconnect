@@ -16,7 +16,7 @@ Cargo.lock
 Thumbs.db
 
 # Logs
-*.log
+**/log.txt
 
 # Signing keys (keep these secure!)
 /keys/

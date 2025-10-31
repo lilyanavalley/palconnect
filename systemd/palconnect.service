@@ -1,0 +1,54 @@
+[Unit]
+Description=PalConnect Discord Bot for PalWorld Server Monitoring
+Documentation=https://github.com/lilyanavalley/palconnect
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=palconnect
+Group=palconnect
+WorkingDirectory=/opt/palconnect
+ExecStart=/opt/palconnect/palconnect
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/tmp /var/log
+PrivateTmp=true
+PrivateDevices=true
+ProtectHostname=true
+ProtectClock=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+PrivateMounts=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Environment
+Environment=RUST_LOG=info
+EnvironmentFile=/etc/palconnect/palconnect.env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=palconnect
+
+[Install]
+WantedBy=multi-user.target

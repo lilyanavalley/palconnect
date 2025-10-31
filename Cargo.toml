@@ -41,3 +41,19 @@ formats = [
     "wix", 
     "deb"
 ]
+
+resources = [
+    "Cargo.toml",
+    "COPYING.md",
+    "README.md",
+    "Dockerfile",
+    ".dockerignore",
+    ".env.example",
+    ".editorconfig",
+    "src/",
+    "scripts/",
+    "docs/",
+]
+
+# [package.metadata.packager.deb]
+# files = ["sytemd/"]
