@@ -202,12 +202,30 @@ async fn help(ctx: Context<'_>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    // * Initialize logging first thing (stdout and file on all platforms)
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} [{}]: {}",
+                record.level(),
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Info)
+        .chain(std::io::stdout())
+        .chain(fern::log_file("log.txt")?)
+        .apply()
+        .expect("Failed to initialize logging");
+
+    info!("🚀 PalConnect starting up...");
     let args = Args::parse();
 
     #[cfg(unix)]
     {
+        info!("🐧 Unix platform detected");
         if args.daemon {
-            debug!("👹 daemonizing");
+            info!("👹 Starting in daemon mode...");
             match fork::daemon(false, false) {
                 Ok(fork::Fork::Child) => {
                     // We are in the child process (daemon)
@@ -238,6 +256,8 @@ async fn main() -> Result<(), Error> {
                 }
             }
             return Ok(());
+        } else {
+            info!("🖥️ Running in foreground mode");
         }
     }
 
@@ -245,22 +265,8 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn dispatcher() -> Result<(), Error> {
-    // * Initialize logging (stdout and file on all platforms)
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{} [{}]: {}",
-                record.level(),
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Info)
-        .chain(std::io::stdout())
-        .chain(fern::log_file("log.txt")?)
-        .apply()
-        .expect("Failed to initialize logging");
-
+    info!("🔧 Starting main application dispatcher...");
+    
     // * Load environment variables from .env file
     dotenv::dotenv().ok();
 
