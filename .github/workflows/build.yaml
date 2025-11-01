@@ -73,6 +73,19 @@ jobs:
             cargo packager --release --formats ${{ matrix.artifact_suffix }}
           fi
 
+      - name: Include signature files
+        run: |
+          ARTIFACTS=(target/release/*.${{ matrix.artifact_suffix }})
+          for artifact in "${ARTIFACTS[@]}"; do
+            if [ -f "${artifact}.sig" ]; then
+              echo "Including signature file for ${artifact}"
+            else
+              echo "Signature file not found for ${artifact}"
+              exit 1
+            fi
+          done
+        shell: bash
+
       - name: Set build info
         id: build-info
         run: |
@@ -90,10 +103,16 @@ jobs:
           echo "Found artifact: ${ARTIFACTS[0]}"
         shell: bash
 
-      - name: Upload artifacts
+      - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
         with:
           name: palconnect-${{ matrix.os }}-${{ matrix.artifact_suffix }}-${{ github.sha }}
           path: target/release/*.${{ matrix.artifact_suffix }}
           retention-days: 30
 
+      - name: Upload signature artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: palconnect-${{ matrix.os }}-${{ matrix.artifact_suffix }}-${{ github.sha }}-signature
+          path: target/release/*.${{ matrix.artifact_suffix }}.sig
+          retention-days: 30
