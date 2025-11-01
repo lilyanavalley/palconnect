@@ -1,19 +1,19 @@
 {
-  "version": "/0.4.0",
+  "version": "/0.4.1",
   "notes": "Latest release of PalConnect with updated features and bug fixes.",
-  "pub_date": "2025-10-31T18:34:42Z",
+  "pub_date": "2025-11-01T16:47:56Z",
   "platforms": {
     "linux-x86_64": {
       "signature": "",
-      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v/0.4.0/palconnect-linux-x86_64.deb"
+      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v/0.4.1/palconnect-linux-x86_64.deb"
     },
     "darwin-x86_64": {
       "signature": "",
-      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v/0.4.0/palconnect-macos-x86_64.dmg"
+      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v/0.4.1/palconnect-macos-x86_64.dmg"
     },
     "windows-x86_64": {
       "signature": "",
-      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v/0.4.0/palconnect-windows-x86_64.msi"
+      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v/0.4.1/palconnect-windows-x86_64.msi"
     }
   }
 }
