@@ -108,7 +108,7 @@ pub async fn force_stop(ctx: Context<'_>) -> Result<(), Error> {
 
     // Attempt to force stop the server.
     let status_resp = client
-        .post(format!("{}/v1/api/info", api_url))
+        .get(format!("{}/v1/api/info", api_url))
         .send()
         .await?;
 
