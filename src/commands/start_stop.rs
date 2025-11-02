@@ -67,7 +67,6 @@ pub async fn stop(
     // Check if the server is already stopped.
     let status_resp = client
         .get(format!("{}/v1/api/info", api_url))
-        .timeout(std::time::Duration::from_secs(1))
         .send()
         .await?;
     
