@@ -1,3 +1,30 @@
+//    .-.                 .;  .-._   .-._.                               .   
+//   (_) )-.             .;'.: (_)`-'                                ...;... 
+//     .:   \  .-.      .;  ::      .-.  . ,';. . ,';.  .-.  .-.      .'     
+//    .:'    );   :    ::   ::   _ ;   ;';;  ;; ;;  ;;.;.-' ;       .;       
+//  .-:. `--' `:::'-'_;;_.- `: .; )`;;' ';  ;; ';  ;;  `:::'`;;;;'.;         
+// (_/                        `--'      ;    `.;    `.                       
+// 
+/////////////////////////////////////////////////////////////////////////////
+// 
+// © Lily Ana Valley <hi@lilyvalley.dev>, 2025
+// 
+// 🪪 LICENSE: AGPL-3
+// This file is part of PalConnect.
+// PalConnect is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+// PalConnect is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+// You should have received a copy of the GNU General Public License along with PalConnect. If not, see <https://www.gnu.org/licenses/>.
+// 
+//////////////////////////////////////////////////////////////////////////
+// 
+/// PalConnect is a cross-server connector between a PalWorld dedicated server and a Discord server.
+/// Using the REST API of a PalWorld server, it's possible to administrate one's world and allow players to check on their world from Discord.
+/// 
+/// 🚧 PalConnect is pre-release software until version `1.0.0` is published. Observations of bot instability, feature changes and inconsistency is to be expected.
+/// 
+/// Leave your feedback on the [GitHub Repo](https://github.com/lilyanavalley/palconnect) to help improve this software.
+///
+// TODO: include documentation on *how* to use this app.
 
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use cargo_packager_updater;
