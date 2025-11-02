@@ -50,35 +50,19 @@ pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
 // TODO: Take shortened arguments for time (-t) and message (-m).
 /// Stop the server. May take 2 arguments: --time <seconds> / --message <custom shutdown message>
 #[poise::command(slash_command)]
-pub async fn stop(ctx: Context<'_>, message: serenity::Message) -> Result<(), Error> {
+pub async fn stop(
+    ctx: Context<'_>,
+    #[description = "Shutdown delay in seconds (default: 60)"] time: Option<u64>,
+    #[description = "Custom shutdown message"] message: Option<String>,
+) -> Result<(), Error> {
 
     let data = ctx.data();
     let api_url = &data.palworld_api_url;
     let client = &data.http_client;
 
-    let mut shutdown_time: u64 = 60; // Default shutdown time
-    let mut shutdown_message: String = "initiating shutdown via Discord".to_string(); // Default message
-    // Process additional arguments for the stop command.
-    let args: Vec<&str> = message.content.split_whitespace().collect();
-    args.windows(2);
-    for (i, arg) in args.iter().enumerate() {
-        match *arg {
-            "--time" => {
-                if let Some(time_str) = args.get(i + 1) {
-                    if let Ok(time) = time_str.parse::<u64>() {
-                        shutdown_time = time;
-                    }
-                }
-            }
-            "--message" => {
-                if let Some(msg) = args.get(i + 1) {
-                    shutdown_message = msg.to_string();
-                    // TODO: Limit length of custom message.
-                }
-            }
-            _ => {}
-        }
-    }
+    let shutdown_time: u64 = time.unwrap_or(60); // Default shutdown time
+    let mut shutdown_message: String = message.unwrap_or_else(|| "initiating shutdown via Discord".to_string());
+    // TODO: Limit length of custom message if needed.
 
     // Check if the server is already stopped.
     let status_resp = client
