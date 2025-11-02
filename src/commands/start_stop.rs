@@ -1,6 +1,5 @@
 
 use poise::serenity_prelude::{self as serenity, CreateButton};
-use serde::Deserialize;
 
 use crate::{Context, Error};
 
