@@ -166,8 +166,10 @@ pub async fn force_stop(ctx: Context<'_>) -> Result<(), Error> {
 
                 let stop_status_message = match stop_status {
                     Ok(s) => format!("✅ PalWorld server has been force stopped. ({})", s.status()),
-                    Err(e) => format!("❌ Failed to force stop the PalWorld server. ({})", e.status().unwrap_or(reqwest::StatusCode::INTERNAL_SERVER_ERROR))
-                };
+                    Err(e) => match e.status() {
+                        Some(status) => format!("❌ Failed to force stop the PalWorld server. (HTTP status: {})", status),
+                        None => format!("❌ Failed to force stop the PalWorld server. (Error: {})", e.to_string()),
+                    },
                 ctx.send(
                     poise::CreateReply::default().content(stop_status_message)
                 ).await?;
