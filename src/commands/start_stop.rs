@@ -97,7 +97,7 @@ pub async fn stop(
 
 /// Force stop the server
 #[poise::command(slash_command)]
-pub async fn force_stop(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
 
     let data = ctx.data();
     let api_url = &data.palworld_api_url;
@@ -167,6 +167,7 @@ pub async fn force_stop(ctx: Context<'_>) -> Result<(), Error> {
                         Some(status) => format!("❌ Failed to force stop the PalWorld server. (HTTP status: {})", status),
                         None => format!("❌ Failed to force stop the PalWorld server. (Error: {})", e.to_string()),
                     },
+                };
                 ctx.send(
                     poise::CreateReply::default().content(stop_status_message)
                 ).await?;
