@@ -199,7 +199,7 @@ async fn dispatcher() -> Result<(), Error> {
     // * Setup Discord bot
     let framework_poise = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![players(), serverinfo(), help()],
+            commands: vec![players(), serverinfo(), help(), start(), stop(), forcestop()],
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {
