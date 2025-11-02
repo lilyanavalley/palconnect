@@ -78,10 +78,12 @@ pub async fn stop(
 
     let status_resp = client
         .post(format!("{}/v1/api/shutdown", api_url))
-        .body(format!(
-            r#"{{"waittime": {},"message": "{}"}}"#,
-            shutdown_time, shutdown_message
-        ))
+        .body(
+            serde_json::json!({
+                "waittime": shutdown_time,
+                "message": shutdown_message
+            }).to_string()
+        )
         .send()
         .await?;
 
