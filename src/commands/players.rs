@@ -1,6 +1,5 @@
 
 use poise::serenity_prelude as serenity;
-use reqwest::Client;
 use serde::Deserialize;
 
 use crate::{Context, Error};
