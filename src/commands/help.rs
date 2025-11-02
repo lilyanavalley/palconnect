@@ -12,6 +12,9 @@ pub async fn help(ctx: Context<'_>) -> Result<(), Error> {
         .description("A Discord bot for monitoring your PalWorld dedicated server")
         .field("/players", "Show current online players and count", false)
         .field("/serverinfo", "Display server information", false)
+        .field("/start", "Start the PalWorld server", false)
+        .field("/stop", "Stop the PalWorld server", false)
+        .field("/force_stop", "Force stop the PalWorld server", false)
         .field("/help", "Show this help message", false)
         .color(0x7289da)
         .footer(serenity::CreateEmbedFooter::new(concat!(
