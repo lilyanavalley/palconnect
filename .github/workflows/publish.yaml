@@ -34,6 +34,10 @@ jobs:
         run: |
           mkdir -p ./release-assets
           
+          # Debug: Show artifact structure
+          echo "Artifact structure:"
+          find ./artifacts -type f | sort
+          
           # Find and rename package files
           find ./artifacts -name "*.deb" -exec cp {} ./release-assets/palconnect-linux-x86_64.deb \;
           find ./artifacts -name "*.dmg" -exec cp {} ./release-assets/palconnect-macos-x86_64.dmg \;
@@ -106,19 +110,35 @@ jobs:
           DARWIN_SIG=""  
           WINDOWS_SIG=""
           
+          # Debug: List all downloaded artifacts
+          echo "Downloaded artifacts structure:"
+          find ./artifacts -type f -name "*.sig" || echo "No .sig files found"
+          
           # Extract Linux signature
-          if [ -f "./artifacts/palconnect-ubuntu-latest-deb-${{ github.sha }}/palconnect.deb.sig" ]; then
-            LINUX_SIG=$(base64 -w 0 "./artifacts/palconnect-ubuntu-latest-deb-${{ github.sha }}/palconnect.deb.sig")
+          LINUX_SIG_FILE=$(find ./artifacts -name "palconnect-ubuntu-latest-deb-${{ github.sha }}-signature" -type d -exec find {} -name "*.deb.sig" \; | head -1)
+          if [ -n "$LINUX_SIG_FILE" ] && [ -f "$LINUX_SIG_FILE" ]; then
+            LINUX_SIG=$(base64 -w 0 "$LINUX_SIG_FILE")
+            echo "Found Linux signature: $LINUX_SIG_FILE"
+          else
+            echo "Linux signature not found"
           fi
           
           # Extract macOS signature  
-          if [ -f "./artifacts/palconnect-macos-latest-dmg-${{ github.sha }}/palconnect.dmg.sig" ]; then
-            DARWIN_SIG=$(base64 -w 0 "./artifacts/palconnect-macos-latest-dmg-${{ github.sha }}/palconnect.dmg.sig")
+          DARWIN_SIG_FILE=$(find ./artifacts -name "palconnect-macos-latest-dmg-${{ github.sha }}-signature" -type d -exec find {} -name "*.dmg.sig" \; | head -1)
+          if [ -n "$DARWIN_SIG_FILE" ] && [ -f "$DARWIN_SIG_FILE" ]; then
+            DARWIN_SIG=$(base64 -w 0 "$DARWIN_SIG_FILE")
+            echo "Found macOS signature: $DARWIN_SIG_FILE"
+          else
+            echo "macOS signature not found"
           fi
           
           # Extract Windows signature
-          if [ -f "./artifacts/palconnect-windows-latest-msi-${{ github.sha }}/palconnect.msi.sig" ]; then
-            WINDOWS_SIG=$(base64 -w 0 "./artifacts/palconnect-windows-latest-msi-${{ github.sha }}/palconnect.msi.sig")
+          WINDOWS_SIG_FILE=$(find ./artifacts -name "palconnect-windows-latest-msi-${{ github.sha }}-signature" -type d -exec find {} -name "*.msi.sig" \; | head -1)
+          if [ -n "$WINDOWS_SIG_FILE" ] && [ -f "$WINDOWS_SIG_FILE" ]; then
+            WINDOWS_SIG=$(base64 -w 0 "$WINDOWS_SIG_FILE")
+            echo "Found Windows signature: $WINDOWS_SIG_FILE"
+          else
+            echo "Windows signature not found"
           fi
           
           # Output signatures for next step

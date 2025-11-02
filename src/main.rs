@@ -1,4 +1,3 @@
-use std::env;
 
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use cargo_packager_updater;
@@ -16,13 +15,14 @@ use std::io::Write;
 use syslog;
 use tokio::signal;
 
+mod config;
+use config::*;
 mod health_check;
 use health_check::*;
 
 const UPDATE_ENDPOINT: &str =
     "https://github.com/lilyanavalley/palconnect/releases/download/updates";
 const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
-const UPDATE_ENABLE: &str = "false"; // * Default value
 
 #[derive(Parser)]
 #[command(name = "palconnect")]
@@ -105,7 +105,7 @@ async fn players(ctx: Context<'_>) -> Result<(), Error> {
                     .title("🎮 PalWorld Server Status")
                     .field("Players Online", player_count.to_string(), true)
                     .field("Player List", player_list, false)
-                    .color(if player_count > 0 { 0x00ff00 } else { 0xff0000 })
+                    .color(if player_count > 0 { 0x00ff00 } else { 0xff0000 }) // Green if players online, red if none
                     .timestamp(serenity::Timestamp::now());
 
                 ctx.send(poise::CreateReply::default().embed(embed)).await?;
@@ -150,11 +150,12 @@ async fn serverinfo(ctx: Context<'_>) -> Result<(), Error> {
         Ok(response) => match response.json::<ServerInfo>().await {
             Ok(server_info) => {
                 let embed = serenity::CreateEmbed::new()
+                    // TODO: Allow custom server info by selections
                     .title("🏰 Server Information")
                     .field("Server Name", &server_info.servername, true)
                     .field("Version", &server_info.version, true)
                     .field("Description", &server_info.description, false)
-                    .color(0x0099ff)
+                    .color(0x0099ff) // TODO: Allow custom color
                     .timestamp(serenity::Timestamp::now());
 
                 ctx.send(poise::CreateReply::default().embed(embed)).await?;
@@ -202,12 +203,30 @@ async fn help(ctx: Context<'_>) -> Result<(), Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    // * Initialize logging first thing (stdout and file on all platforms)
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} [{}]: {}",
+                record.level(),
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Info)
+        .chain(std::io::stdout())
+        .chain(fern::log_file("log.txt")?)
+        .apply()
+        .expect("Failed to initialize logging");
+
+    info!("🚀 PalConnect starting up...");
     let args = Args::parse();
 
     #[cfg(unix)]
     {
+        info!("🐧 Unix platform detected");
         if args.daemon {
-            debug!("👹 daemonizing");
+            info!("👹 Starting in daemon mode...");
             match fork::daemon(false, false) {
                 Ok(fork::Fork::Child) => {
                     // We are in the child process (daemon)
@@ -238,6 +257,8 @@ async fn main() -> Result<(), Error> {
                 }
             }
             return Ok(());
+        } else {
+            info!("🖥️ Running in foreground mode");
         }
     }
 
@@ -245,42 +266,12 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn dispatcher() -> Result<(), Error> {
-    // * Initialize logging (stdout and file on all platforms)
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{} [{}]: {}",
-                record.level(),
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Info)
-        .chain(std::io::stdout())
-        .chain(fern::log_file("log.txt")?)
-        .apply()
-        .expect("Failed to initialize logging");
-
-    // * Load environment variables from .env file
-    dotenv::dotenv().ok();
-
-    // * Load environment variables
-    let discord_token =
-        env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN environment variable");
-    let palworld_api_url =
-        env::var("PALWORLD_API_URL").unwrap_or_else(|_| "http://localhost:8212".to_string());
-    let admin_password = env::var("PALWORLD_ADMIN_PASSWORD")
-        .expect("Expected PALWORLD_ADMIN_PASSWORD environment variable");
-    let updates_auto_enable = <bool as std::str::FromStr>::from_str(
-        env::var(UPDATE_ENABLE)
-            .unwrap_or_else(|_| UPDATE_ENABLE.to_string())
-            .to_lowercase()
-            .as_str(),
-    )
-    .expect("Failed to parse UPDATES_AUTO_ENABLE as bool");
+    info!("🔧 Starting main application dispatcher...");
+    
+    let config = setup();
 
     // * Check for updates and apply if available
-    if updates_auto_enable {
+    if config.autoupdate() {
         info!("🔄 Autoupdate enabled, checking online for newer copy...");
         info!("Current version number: {}", env!("CARGO_PKG_VERSION"));
 
@@ -323,12 +314,12 @@ async fn dispatcher() -> Result<(), Error> {
         }
     }
 
-    if !updates_auto_enable {
+    if !config.autoupdate() {
         info!("⏸️ Autoupdate disabled, skipping update check");
     }
 
     info!("🚀 Starting PalConnect bot...");
-    info!("📡 PalWorld API URL: {}", palworld_api_url);
+    info!("📡 PalWorld API URL: {}", config.palworld_api_url);
 
     // * Setup Discord bot
     let framework_poise = poise::Framework::builder()
@@ -337,8 +328,8 @@ async fn dispatcher() -> Result<(), Error> {
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {
-            let palworld_api_url = palworld_api_url.clone();
-            let admin_password = admin_password.clone();
+            let palworld_api_url = config.palworld_api_url.clone();
+            let admin_password = config.palworld_admin_password.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(BotData {
@@ -351,14 +342,14 @@ async fn dispatcher() -> Result<(), Error> {
         .build();
 
     let poise_intents = serenity::GatewayIntents::non_privileged();
-    let mut poise_client = serenity::ClientBuilder::new(discord_token, poise_intents)
+    let mut poise_client = serenity::ClientBuilder::new(config.discord_token, poise_intents)
         .framework(framework_poise)
         .await
         .expect("Failed to create Discord client");
 
     // * Setup Actix Web server
     let actix_server = HttpServer::new(|| App::new().service(health_check))
-        .bind(("0.0.0.0", 3000))?
+        .bind(("0.0.0.0", config.heartbeat_port.unwrap_or(8080)))?
         .run();
 
     info!("✅ Starting both Discord bot and health check server...");
