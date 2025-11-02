@@ -17,12 +17,19 @@ use tokio::signal;
 
 mod config;
 use config::*;
+mod commands;
+use commands::*;
 mod health_check;
 use health_check::*;
+
+
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Context<'a> = poise::Context<'a, BotData, Error>;
 
 const UPDATE_ENDPOINT: &str =
     "https://github.com/lilyanavalley/palconnect/releases/download/updates";
 const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
+
 
 #[derive(Parser)]
 #[command(name = "palconnect")]
@@ -40,165 +47,6 @@ pub struct BotData {
     http_client: Client,
     palworld_api_url: String,
     admin_password: String,
-}
-
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, BotData, Error>;
-
-// PalWorld API response structures
-#[derive(Debug, Deserialize)]
-struct ServerInfo {
-    version: String,
-    servername: String,
-    description: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct PlayersResponse {
-    players: Vec<Player>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Player {
-    name: String,
-    #[serde(rename = "playerId")]
-    player_id: String,
-    #[serde(rename = "userId")]
-    user_id: String,
-    ip: String,
-    ping: f64,
-    location_x: f64,
-    location_y: f64,
-    level: u32,
-}
-
-/// Show current player count on the PalWorld server
-#[poise::command(slash_command)]
-async fn players(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.defer().await?;
-
-    let data = ctx.data();
-    let url = format!("{}/v1/api/players", data.palworld_api_url);
-
-    match data
-        .http_client
-        .get(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .send()
-        .await
-    {
-        Ok(response) => match response.json::<PlayersResponse>().await {
-            Ok(players_data) => {
-                let player_count = players_data.players.len();
-                let player_list = if players_data.players.is_empty() {
-                    "No players currently online".to_string()
-                } else {
-                    players_data
-                        .players
-                        .iter()
-                        .map(|p| format!("• {} (Level {})", p.name, p.level))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                };
-
-                let embed = serenity::CreateEmbed::new()
-                    .title("🎮 PalWorld Server Status")
-                    .field("Players Online", player_count.to_string(), true)
-                    .field("Player List", player_list, false)
-                    .color(if player_count > 0 { 0x00ff00 } else { 0xff0000 }) // Green if players online, red if none
-                    .timestamp(serenity::Timestamp::now());
-
-                ctx.send(poise::CreateReply::default().embed(embed)).await?;
-            }
-            Err(e) => {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to parse server response: {}", e))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
-        },
-        Err(e) => {
-            ctx.send(
-                poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
-                    .ephemeral(true),
-            )
-            .await?;
-        }
-    }
-
-    Ok(())
-}
-
-/// Show server information
-#[poise::command(slash_command)]
-async fn serverinfo(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.defer().await?;
-
-    let data = ctx.data();
-    let url = format!("{}/v1/api/info", data.palworld_api_url);
-
-    match data
-        .http_client
-        .get(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .send()
-        .await
-    {
-        Ok(response) => match response.json::<ServerInfo>().await {
-            Ok(server_info) => {
-                let embed = serenity::CreateEmbed::new()
-                    // TODO: Allow custom server info by selections
-                    .title("🏰 Server Information")
-                    .field("Server Name", &server_info.servername, true)
-                    .field("Version", &server_info.version, true)
-                    .field("Description", &server_info.description, false)
-                    .color(0x0099ff) // TODO: Allow custom color
-                    .timestamp(serenity::Timestamp::now());
-
-                ctx.send(poise::CreateReply::default().embed(embed)).await?;
-            }
-            Err(e) => {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to parse server response: {}", e))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
-        },
-        Err(e) => {
-            ctx.send(
-                poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
-                    .ephemeral(true),
-            )
-            .await?;
-        }
-    }
-
-    Ok(())
-}
-
-/// Show help information
-#[poise::command(slash_command)]
-async fn help(ctx: Context<'_>) -> Result<(), Error> {
-    let embed = serenity::CreateEmbed::new()
-        .title("🤖 PalConnect Bot Help")
-        .description("A Discord bot for monitoring your PalWorld dedicated server")
-        .field("/players", "Show current online players and count", false)
-        .field("/serverinfo", "Display server information", false)
-        .field("/help", "Show this help message", false)
-        .color(0x7289da)
-        .footer(serenity::CreateEmbedFooter::new(concat!(
-            "PalConnect Bot ",
-            env!("CARGO_PKG_VERSION")
-        )));
-
-    ctx.send(poise::CreateReply::default().embed(embed)).await?;
-    Ok(())
 }
 
 #[tokio::main]
