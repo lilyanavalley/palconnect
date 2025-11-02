@@ -4,7 +4,7 @@
 A Discord bot that connects to PalWorld Dedicated Server REST API to show real-time player information and server status.
 
 > [!WARNING]
-> PalConnect is a work in progress!
+> PalConnect is a work in progress! Until release version 1.0.0, please assume instability and inconsistency.
 
 ## Features
 
