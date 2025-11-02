@@ -15,7 +15,7 @@ on:
         value: ${{ jobs.building.outputs.artifacts }}
   push:
     tags:
-      - v/*.*.*
+      - v*.*.*
 
 jobs:
 
