@@ -19,6 +19,7 @@ pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
     // Check if the server is already running.
     let status_resp = client
         .get(format!("{}/v1/api/info", api_url))
+        .basic_auth("admin", Some(&data.admin_password))
         .send()
         .await?;
     
@@ -65,6 +66,7 @@ pub async fn stop(
     // Check if the server is already stopped.
     let status_resp = client
         .get(format!("{}/v1/api/info", api_url))
+        .basic_auth("admin", Some(&data.admin_password))
         .send()
         .await?;
     
@@ -78,6 +80,7 @@ pub async fn stop(
 
     let status_resp = client
         .post(format!("{}/v1/api/shutdown", api_url))
+        .basic_auth("admin", Some(&data.admin_password))
         .body(
             serde_json::json!({
                 "waittime": shutdown_time,
@@ -108,6 +111,7 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
     // Attempt to force stop the server.
     let status_resp = client
         .get(format!("{}/v1/api/info", api_url))
+        .basic_auth("admin", Some(&data.admin_password))
         .send()
         .await?;
 
@@ -159,6 +163,7 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
 
                 let stop_status = client
                     .post(format!("{}/v1/api/stop", api_url))
+                    .basic_auth("admin", Some(&data.admin_password))
                     .timeout(std::time::Duration::from_secs(3))
                     .send()
                     .await;
