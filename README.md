@@ -19,7 +19,7 @@ A Discord bot that connects to PalWorld Dedicated Server REST API to show real-t
 - `/serverinfo` - Display server information
 - `/start` - Start PalWorld server
 - `/stop` - Stop PalWorld server (with delay and/or message.)
-- `/force stop` - Immediately stop PalWorld server
+- `/forcestop` - Immediately stop PalWorld server
 - `/help` - Show help message
 
 ## Setup
