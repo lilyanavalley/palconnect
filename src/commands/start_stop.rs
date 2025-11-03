@@ -94,6 +94,12 @@ pub async fn stop(
         ctx.send(poise::CreateReply::default().content(
             format!("🛑 Sent shutdown command to PalWorld server. Delay: {shutdown_time} seconds.\n  {shutdown_message}"))
         ).await?;
+    } else {
+        let status = status_resp.status();
+        let body = status_resp.text().await.unwrap_or_else(|_| "<failed to read response body>".to_string());
+        ctx.send(poise::CreateReply::default().content(
+            format!("❌ Failed to send shutdown command to PalWorld server. Status: {status}. Response: {body}")
+        )).await?;
     }
 
     Ok(())
