@@ -5,7 +5,7 @@ use crate::{Context, Error};
 
 
 const PALWORLD_SYSTEMD_NAME: &str = "palworld.service";
-const PROMPT_TO_REBOOT: &str = "Type `/restart` to restart the server instead (**be careful, this will disconnect all players.**)";
+const PROMPT_TO_REBOOT: &str = "If you need to restart the server, please stop it first using `/stop` and then start it again using `/start`. (**Be careful, this will disconnect all players.**)";
 
 
 /// Start the server
