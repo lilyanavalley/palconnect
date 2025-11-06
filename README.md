@@ -18,8 +18,15 @@ A Discord bot that connects to PalWorld Dedicated Server REST API to show real-t
 - `/players` - Show current online players and count
 - `/serverinfo` - Display server information
 - `/start` - Start PalWorld server
-- `/stop` - Stop PalWorld server (with delay and/or message.)
+- `/stop` - Stop PalWorld server (with delay and/or message)
 - `/forcestop` - Immediately stop PalWorld server
+- `/settings` - Print PalWorld server settings
+- `/metrics` - Print PalWorld server metrics
+- `/announce` - Announce a message to all players
+- `/kick` - Kick a player from the server
+- `/ban` - Ban a player from the server
+- `/unban` - Unban a previously banned player
+- `/save` - Save the world
 - `/help` - Show help message
 
 ## Setup
@@ -97,6 +104,15 @@ Commands are defined using the `#[poise::command(slash_command)]` attribute. Add
 The bot currently uses these PalWorld REST API endpoints:
 - `GET /v1/api/players` - Get current players
 - `GET /v1/api/info` - Get server information
+- `GET /v1/api/settings` - Get server settings
+- `GET /v1/api/metrics` - Get server metrics
+- `POST /v1/api/announce` - Announce a message to all players
+- `POST /v1/api/kick` - Kick a player from the server
+- `POST /v1/api/ban` - Ban a player from the server
+- `POST /v1/api/unban` - Unban a player
+- `POST /v1/api/save` - Save the world
+- `POST /v1/api/shutdown` - Gracefully shutdown the server
+- `POST /v1/api/stop` - Force stop the server
 
 ## Releases & Distribution
 

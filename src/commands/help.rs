@@ -30,6 +30,13 @@ pub async fn help(ctx: Context<'_>) -> Result<(), Error> {
         .field("/start", "Start the PalWorld server", false)
         .field("/stop", "Stop the PalWorld server", false)
         .field("/forcestop", "Force stop the PalWorld server", false)
+        .field("/settings", "Print PalWorld server settings", false)
+        .field("/metrics", "Print PalWorld server metrics", false)
+        .field("/announce", "Announce a message to all players", false)
+        .field("/kick", "Kick a player from the server", false)
+        .field("/ban", "Ban a player from the server", false)
+        .field("/unban", "Unban a previously banned player", false)
+        .field("/save", "Save the world", false)
         .field("/help", "Show this help message", false)
         .color(0x7289da)
         .footer(serenity::CreateEmbedFooter::new(concat!(
