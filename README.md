@@ -15,6 +15,7 @@ A Discord bot that connects to PalWorld Dedicated Server REST API to show real-t
 
 ## Commands
 
+- `/about` - Show information about PalConnect bot
 - `/players` - Show current online players and count
 - `/serverinfo` - Display server information
 - `/start` - Start PalWorld server
