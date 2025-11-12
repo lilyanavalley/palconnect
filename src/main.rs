@@ -258,10 +258,10 @@ async fn dispatcher() -> Result<(), Error> {
                 
                 // Start the status updater background task with Arc-wrapped data
                 let ctx_arc = std::sync::Arc::new(ctx_clone);
-                let bot_data_arc = std::sync::Arc::new(bot_data);
-                start_status_updater(ctx_arc, bot_data_arc.clone(), status_interval).await;
+                let bot_data_arc = std::sync::Arc::new(bot_data.clone());
+                start_status_updater(ctx_arc, bot_data_arc, status_interval).await;
                 
-                Ok((*bot_data_arc).clone())
+                Ok(bot_data)
             })
         })
         .build();

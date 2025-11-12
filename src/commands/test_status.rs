@@ -23,10 +23,10 @@ use std::sync::Arc;
 pub async fn update_status(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
 
-    let bot_data = Arc::new(ctx.data().clone());
-    let serenity_ctx = Arc::new(ctx.serenity_context().clone());
+    let bot_data = ctx.data();
+    let serenity_ctx = ctx.serenity_context();
     
-    match update_status_now(&serenity_ctx, &bot_data).await {
+    match update_status_now(serenity_ctx, bot_data).await {
         Ok(_) => {
             ctx.send(poise::CreateReply::default()
                 .content("✅ Bot status updated successfully!")
