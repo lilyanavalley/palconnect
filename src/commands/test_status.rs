@@ -16,7 +16,6 @@
 
 use crate::{Context, Error};
 use crate::glance::update_status_now;
-use std::sync::Arc;
 
 /// Manually trigger a bot status update (useful for testing)
 #[poise::command(slash_command)]
