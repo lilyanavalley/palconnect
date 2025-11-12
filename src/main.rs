@@ -56,9 +56,11 @@ use poise::serenity_prelude as serenity;
 use reqwest::Client;
 use std::fs;
 use std::io::Write;
+use std::sync::{Arc, Mutex};
 #[cfg(unix)]
 use syslog;
 use tokio::signal;
+use tokio_util::sync::CancellationToken;
 
 mod config;
 use config::*;
@@ -221,6 +223,12 @@ async fn dispatcher() -> Result<(), Error> {
     let heartbeat_port = config.heartbeat_port.unwrap_or(8080);
     let discord_token = config.discord_token.clone();
 
+    // Create cancellation token and JoinHandle storage for graceful shutdown
+    let cancellation_token = CancellationToken::new();
+    let status_updater_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
+    let status_updater_handle_clone = status_updater_handle.clone();
+    let cancellation_token_clone = cancellation_token.clone();
+
     // * Setup Discord bot
     let framework_poise = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -259,7 +267,10 @@ async fn dispatcher() -> Result<(), Error> {
                 // Start the status updater background task with Arc-wrapped data
                 let ctx_arc = std::sync::Arc::new(ctx_clone);
                 let bot_data_arc = std::sync::Arc::new(bot_data.clone());
-                start_status_updater(ctx_arc, bot_data_arc, status_interval).await;
+                let handle = start_status_updater(ctx_arc, bot_data_arc, status_interval, cancellation_token_clone).await;
+                
+                // Store the JoinHandle for graceful shutdown
+                *status_updater_handle_clone.lock().unwrap() = Some(handle);
                 
                 Ok(bot_data)
             })
@@ -291,6 +302,18 @@ async fn dispatcher() -> Result<(), Error> {
         }
         _ = signal::ctrl_c() => {
             info!("🛑 Received Ctrl+C, shutting down gracefully...");
+        }
+    }
+
+    // Cancel the status updater and wait for it to finish
+    info!("🛑 Cancelling status updater...");
+    cancellation_token.cancel();
+    
+    let handle = status_updater_handle.lock().unwrap().take();
+    if let Some(handle) = handle {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
+            Ok(_) => info!("✅ Status updater stopped gracefully"),
+            Err(_) => warn!("⚠️ Status updater did not stop within timeout"),
         }
     }
 

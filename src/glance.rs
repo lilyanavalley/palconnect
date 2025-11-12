@@ -21,6 +21,8 @@ use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::interval;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use crate::{BotData, Error};
 
@@ -50,11 +52,13 @@ struct ServerInfo {
 }
 
 /// Start the background task that updates the bot's status with server information
+/// Returns a JoinHandle that can be used to wait for task completion
 pub async fn start_status_updater(
     ctx: Arc<serenity::Context>,
     bot_data: Arc<BotData>,
     update_interval_seconds: u64,
-) {
+    cancellation_token: CancellationToken,
+) -> JoinHandle<()> {
     info!("🔄 Starting status updater with {}s interval", update_interval_seconds);
     
     let mut interval_timer = interval(Duration::from_secs(update_interval_seconds));
@@ -64,14 +68,20 @@ pub async fn start_status_updater(
     
     tokio::spawn(async move {
         loop {
-            interval_timer.tick().await;
-            
-            match update_bot_status(&ctx, &bot_data).await {
-                Ok(_) => debug!("✅ Status updated successfully"),
-                Err(e) => error!("❌ Failed to update status: {}", e),
+            tokio::select! {
+                _ = cancellation_token.cancelled() => {
+                    info!("🛑 Status updater shutting down gracefully");
+                    break;
+                }
+                _ = interval_timer.tick() => {
+                    match update_bot_status(&ctx, &bot_data).await {
+                        Ok(_) => debug!("✅ Status updated successfully"),
+                        Err(e) => error!("❌ Failed to update status: {}", e),
+                    }
+                }
             }
         }
-    });
+    })
 }
 
 /// Update the bot's status with current server information
