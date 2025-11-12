@@ -26,21 +26,22 @@ use crate::{BotData, Error};
 
 #[derive(Debug, Deserialize)]
 struct PlayersResponse {
-    players: Vec<Player>,
-}
+    
+    #[serde(rename = "currentplayernum")]
+    current_player_num: usize,
 
-#[derive(Debug, Deserialize)]
-struct Player {
-    name: String,
-    #[serde(rename = "playerId")]
-    player_id: String,
-    #[serde(rename = "userId")]
-    user_id: String,
-    ip: String,
-    ping: f64,
-    location_x: f64,
-    location_y: f64,
-    level: u32,
+    // * Unused fields for future use or reference
+    #[serde(rename = "maxplayernum")]
+    _max_player_num: usize,
+    #[serde(rename = "serverframetime")]
+    _server_frame_time: f32,
+    #[serde(rename = "serverfps")]
+    _server_fps: usize,
+    #[serde(rename = "uptime")]
+    _uptime: usize,
+    #[serde(rename = "days")]
+    _days: usize
+
 }
 
 #[derive(Debug, Deserialize)]
@@ -113,17 +114,18 @@ async fn get_player_count(
     palworld_api_url: &str,
     admin_password: &str,
 ) -> Result<usize, Error> {
-    let url = format!("{}/v1/api/players", palworld_api_url);
-    
+    let url = format!("{}/v1/api/metrics", palworld_api_url);
+
     let response = http_client
         .get(&url)
         .basic_auth("admin", Some(admin_password))
         .timeout(Duration::from_secs(10)) // 10 second timeout
         .send()
         .await?;
-    
-    let players_data: PlayersResponse = response.json().await?;
-    Ok(players_data.players.len())
+
+    let count: PlayersResponse = response.json().await?;
+
+    Ok(count.current_player_num)
 }
 
 /// Get server information from the PalWorld server
