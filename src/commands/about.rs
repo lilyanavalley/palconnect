@@ -26,7 +26,7 @@ pub async fn about(ctx: Context<'_>) -> Result<(), Error> {
         .title("ℹ️ About PalConnect")
         .description("PalConnect is a Discord bot for monitoring your PalWorld dedicated server and integrating server management commands into Discord.")
         .field("Version", env!("CARGO_PKG_VERSION"), false)
-        .field("Author", "Lily Ana Valley <hi@lilyvalley.dev>", false)
+        .field("Author", "Lily Ana Valley — <hi@lilyvalley.dev>", false)
         .field("License", "GNU Affero General Public License v3.0 (AGPLv3) https://www.gnu.org/licenses/agpl-3.0.en.html", false)
         .field("Source Code", "https://github.com/lilyanavalley/palconnect", false)
         .color(0x7289da);
