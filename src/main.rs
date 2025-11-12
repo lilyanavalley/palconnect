@@ -254,7 +254,6 @@ async fn dispatcher() -> Result<(), Error> {
             let palworld_api_url = config.palworld_api_url.clone();
             let admin_password = config.palworld_admin_password.clone();
             let status_interval = config.status_update_interval();
-            let ctx_clone = ctx.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 
@@ -265,7 +264,7 @@ async fn dispatcher() -> Result<(), Error> {
                 };
                 
                 // Start the status updater background task with Arc-wrapped data
-                let ctx_arc = std::sync::Arc::new(ctx_clone);
+                let ctx_arc = std::sync::Arc::new(ctx.clone());
                 let bot_data_arc = std::sync::Arc::new(bot_data.clone());
                 let handle = start_status_updater(ctx_arc, bot_data_arc, status_interval, cancellation_token_clone).await;
                 
