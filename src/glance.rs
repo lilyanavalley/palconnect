@@ -87,7 +87,7 @@ async fn update_bot_status(
             match get_server_info(&bot_data.http_client, &bot_data.palworld_api_url, &bot_data.admin_password).await {
                 Ok(server_info) => {
                     // Show player count with server name
-                    let status = format!("{} players | /help", player_count);
+                    let status = format!("{} players on {} | /help", player_count, server_info.servername);
                     ctx.set_activity(Some(serenity::ActivityData::watching(status)));
                     debug!("Status updated: {} players on {}", player_count, server_info.servername);
                 }
