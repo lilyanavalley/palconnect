@@ -28,3 +28,6 @@ pub use start_stop::*;
 
 pub mod admin_commands;
 pub use admin_commands::*;
+
+pub mod test_status;
+pub use test_status::*;

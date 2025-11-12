@@ -36,12 +36,17 @@ pub struct Config {
     pub palworld_admin_password:    String,             // * Required
     pub enable_autoupdate:          Option<bool>,
     pub heartbeat_port:             Option<u16>,
+    pub status_update_interval:     Option<u64>,        // * Status update interval in seconds
     pub logging:                    Option<Logging>,
 }
 
 impl Config {
     pub fn autoupdate(&self) -> bool {
         self.enable_autoupdate.unwrap_or(false)
+    }
+    
+    pub fn status_update_interval(&self) -> u64 {
+        self.status_update_interval.unwrap_or(30) // Default to 30 seconds
     }
 }
 
@@ -53,6 +58,7 @@ impl Default for Config {
             palworld_admin_password:    String::new(),
             enable_autoupdate:          None,
             heartbeat_port:             None,
+            status_update_interval:     None,
             logging:                    None,
         }
     }
@@ -120,6 +126,15 @@ pub fn setup() -> Config {
             )
             .expect("Failed to parse UPDATES_AUTO_ENABLE as bool")
         );
+    }
+
+    if let Ok(status_interval) = env::var("STATUS_UPDATE_INTERVAL") {
+        let interval = status_interval.parse::<u64>()
+            .expect("Failed to parse STATUS_UPDATE_INTERVAL as u64");
+        if interval < 15 {
+            panic!("STATUS_UPDATE_INTERVAL must be at least 15 seconds to avoid excessive API polling (got {}).", interval);
+        }
+        config.status_update_interval = Some(interval);
     }
 
     config

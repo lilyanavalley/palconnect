@@ -91,6 +91,7 @@ The bot will automatically register slash commands when it starts up.
 
 ### Project Structure
 
+- `scripts/` - Scripts related to testing/development
 - `src/main.rs` - Main bot code with commands and API integration
 - `Cargo.toml` - Rust dependencies and project configuration
 - `.env` - Environment variables (create from `.env.example`)
@@ -113,6 +114,8 @@ The bot currently uses these PalWorld REST API endpoints:
 - `POST /v1/api/save` - Save the world
 - `POST /v1/api/shutdown` - Gracefully shutdown the server
 - `POST /v1/api/stop` - Force stop the server
+
+To test the Discord-side of API invocations (PalConnect -> Dedicated Server REST API) mock endpoints are set up with a tool called [Mockoon](https://mockoon.com/). Use the data file included in `/scripts/mockoon.json` to set up endpoints for testing this bot against.
 
 ## Releases & Distribution
 
