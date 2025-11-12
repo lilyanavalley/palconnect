@@ -129,10 +129,12 @@ pub fn setup() -> Config {
     }
 
     if let Ok(status_interval) = env::var("STATUS_UPDATE_INTERVAL") {
-        config.status_update_interval = Some(
-            status_interval.parse::<u64>()
-                .expect("Failed to parse STATUS_UPDATE_INTERVAL as u64")
-        );
+        let interval = status_interval.parse::<u64>()
+            .expect("Failed to parse STATUS_UPDATE_INTERVAL as u64");
+        if interval < 15 {
+            panic!("STATUS_UPDATE_INTERVAL must be at least 15 seconds to avoid excessive API polling (got {}).", interval);
+        }
+        config.status_update_interval = Some(interval);
     }
 
     config
