@@ -75,8 +75,8 @@ pub async fn start_status_updater(
 
 /// Update the bot's status with current server information
 async fn update_bot_status(
-    ctx: &Arc<serenity::Context>,
-    bot_data: &Arc<BotData>,
+    ctx: &serenity::Context,
+    bot_data: &BotData,
 ) -> Result<(), Error> {
     // First try to get player count
     match get_player_count(&bot_data.http_client, &bot_data.palworld_api_url, &bot_data.admin_password).await {
@@ -147,8 +147,8 @@ async fn get_server_info(
 
 /// Manually trigger a status update (useful for testing or immediate updates)
 pub async fn update_status_now(
-    ctx: &Arc<serenity::Context>,
-    bot_data: &Arc<BotData>,
+    ctx: &serenity::Context,
+    bot_data: &BotData,
 ) -> Result<(), Error> {
     update_bot_status(ctx, bot_data).await
 }
