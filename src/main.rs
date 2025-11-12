@@ -45,7 +45,7 @@
 ///
 // TODO: include documentation on *how* to use this app.
 
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpServer};
 use cargo_packager_updater;
 use clap::Parser;
 use fern;
@@ -54,7 +54,6 @@ use fork;
 use log::{debug, error, info, warn};
 use poise::serenity_prelude as serenity;
 use reqwest::Client;
-use serde::Deserialize;
 use std::fs;
 use std::io::Write;
 #[cfg(unix)]
@@ -63,6 +62,8 @@ use tokio::signal;
 
 mod config;
 use config::*;
+mod glance;
+use glance::*;
 mod commands;
 use commands::*;
 mod health_check;
@@ -89,6 +90,7 @@ struct Args {
 }
 
 // Data structure that will be accessible in all command invocations
+#[derive(Clone)]
 pub struct BotData {
     http_client: Client,
     palworld_api_url: String,
@@ -215,6 +217,10 @@ async fn dispatcher() -> Result<(), Error> {
     info!("🚀 Starting PalConnect bot...");
     info!("📡 PalWorld API URL: {}", config.palworld_api_url);
 
+    // Store config values we need later before moving config
+    let heartbeat_port = config.heartbeat_port.unwrap_or(8080);
+    let discord_token = config.discord_token.clone();
+
     // * Setup Discord bot
     let framework_poise = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -232,32 +238,43 @@ async fn dispatcher() -> Result<(), Error> {
                 ban(),
                 unban(),
                 save(),
+                update_status(),
             ],
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {
             let palworld_api_url = config.palworld_api_url.clone();
             let admin_password = config.palworld_admin_password.clone();
+            let status_interval = config.status_update_interval();
+            let ctx_clone = ctx.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(BotData {
+                
+                let bot_data = BotData {
                     http_client: Client::new(),
                     palworld_api_url,
                     admin_password,
-                })
+                };
+                
+                // Start the status updater background task with Arc-wrapped data
+                let ctx_arc = std::sync::Arc::new(ctx_clone);
+                let bot_data_arc = std::sync::Arc::new(bot_data);
+                start_status_updater(ctx_arc, bot_data_arc.clone(), status_interval).await;
+                
+                Ok((*bot_data_arc).clone())
             })
         })
         .build();
 
     let poise_intents = serenity::GatewayIntents::non_privileged();
-    let mut poise_client = serenity::ClientBuilder::new(config.discord_token, poise_intents)
+    let mut poise_client = serenity::ClientBuilder::new(discord_token, poise_intents)
         .framework(framework_poise)
         .await
         .expect("Failed to create Discord client");
 
     // * Setup Actix Web server
     let actix_server = HttpServer::new(|| App::new().service(health_check))
-        .bind(("0.0.0.0", config.heartbeat_port.unwrap_or(8080)))?
+        .bind(("0.0.0.0", heartbeat_port))?
         .run();
 
     info!("✅ Starting both Discord bot and health check server...");
