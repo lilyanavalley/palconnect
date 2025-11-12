@@ -14,6 +14,9 @@
 // <https://www.gnu.org/licenses/>.
 // 
 
+pub mod about;
+pub use about::*;
+
 pub mod help;
 pub use help::*;
 

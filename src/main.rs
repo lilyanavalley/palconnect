@@ -233,6 +233,7 @@ async fn dispatcher() -> Result<(), Error> {
     let framework_poise = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
+                about(),
                 players(),
                 serverinfo(),
                 help(),
