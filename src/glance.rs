@@ -45,9 +45,7 @@ struct Player {
 
 #[derive(Debug, Deserialize)]
 struct ServerInfo {
-    version: String,
     servername: String,
-    description: String,
 }
 
 /// Start the background task that updates the bot's status with server information
