@@ -92,9 +92,10 @@ async fn update_bot_status(
                 }
                 Err(_) => {
                     // Fallback to just player count
-                    let status = format!("{} players online | /help", player_count);
+                    let player_word = if player_count == 1 { "player" } else { "players" };
+                    let status = format!("{} {} online | /help", player_count, player_word);
                     ctx.set_activity(Some(serenity::ActivityData::watching(status)));
-                    debug!("Status updated: {} players (server info unavailable)", player_count);
+                    debug!("Status updated: {} {} (server info unavailable)", player_count, player_word);
                 }
             }
         }
