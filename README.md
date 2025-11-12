@@ -4,7 +4,7 @@
 A Discord bot that connects to PalWorld Dedicated Server REST API to show real-time player information and server status.
 
 > [!WARNING]
-> PalConnect is a work in progress!
+> PalConnect is a work in progress! Until release version 1.0.0, please assume instability and inconsistency.
 
 ## Features
 
@@ -15,8 +15,19 @@ A Discord bot that connects to PalWorld Dedicated Server REST API to show real-t
 
 ## Commands
 
+- `/about` - Show information about PalConnect bot
 - `/players` - Show current online players and count
 - `/serverinfo` - Display server information
+- `/start` - Start PalWorld server
+- `/stop` - Stop PalWorld server (with delay and/or message)
+- `/forcestop` - Immediately stop PalWorld server
+- `/settings` - Print PalWorld server settings
+- `/metrics` - Print PalWorld server metrics
+- `/announce` - Announce a message to all players
+- `/kick` - Kick a player from the server
+- `/ban` - Ban a player from the server
+- `/unban` - Unban a previously banned player
+- `/save` - Save the world
 - `/help` - Show help message
 
 ## Setup
@@ -81,6 +92,7 @@ The bot will automatically register slash commands when it starts up.
 
 ### Project Structure
 
+- `scripts/` - Scripts related to testing/development
 - `src/main.rs` - Main bot code with commands and API integration
 - `Cargo.toml` - Rust dependencies and project configuration
 - `.env` - Environment variables (create from `.env.example`)
@@ -94,6 +106,17 @@ Commands are defined using the `#[poise::command(slash_command)]` attribute. Add
 The bot currently uses these PalWorld REST API endpoints:
 - `GET /v1/api/players` - Get current players
 - `GET /v1/api/info` - Get server information
+- `GET /v1/api/settings` - Get server settings
+- `GET /v1/api/metrics` - Get server metrics
+- `POST /v1/api/announce` - Announce a message to all players
+- `POST /v1/api/kick` - Kick a player from the server
+- `POST /v1/api/ban` - Ban a player from the server
+- `POST /v1/api/unban` - Unban a player
+- `POST /v1/api/save` - Save the world
+- `POST /v1/api/shutdown` - Gracefully shutdown the server
+- `POST /v1/api/stop` - Force stop the server
+
+To test the Discord-side of API invocations (PalConnect -> Dedicated Server REST API) mock endpoints are set up with a tool called [Mockoon](https://mockoon.com/). Use the data file included in `/scripts/mockoon.json` to set up endpoints for testing this bot against.
 
 ## Releases & Distribution
 

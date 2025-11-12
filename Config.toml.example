@@ -1,0 +1,29 @@
+# PalConnect Configuration Example
+# This shows how to configure the new status update feature
+
+# Discord bot token (required)
+discord_token = "YOUR_DISCORD_BOT_TOKEN_HERE"
+
+# PalWorld server API URL (required)
+palworld_api_url = "http://your-server:8212"
+
+# PalWorld admin password (required)
+palworld_admin_password = "YOUR_ADMIN_PASSWORD"
+
+# Enable automatic updates (optional, default: false)
+enable_autoupdate = true
+
+# Port for health check endpoint (optional, default: 8080)
+heartbeat_port = 8080
+
+# Status update interval in seconds (optional, default: 30)
+# This controls how often the bot updates its activity status
+# with the current player count from your PalWorld server
+status_update_interval = 30
+
+[logging]
+# Logging configuration (optional)
+use_syslog = false
+use_stdout = true
+use_file = true
+use_file_path = "./log.txt"

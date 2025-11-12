@@ -1,5 +1,51 @@
+// 
+//  ,ggggggggggg,                   ,gggg,                                                                   
+// dP"""88""""""Y8,      ,dPYb,   ,88"""Y8b,                                                            I8   
+// Yb,  88      `8b      IP'`Yb  d8"     `Y8                                                            I8   
+//  `"  88      ,8P      I8  8I d8'   8b  d8                                                         88888888
+//      88aaaad8P"       I8  8',8I    "Y88P'                                                            I8   
+//      88""""",gggg,gg  I8 dP I8'            ,ggggg,    ,ggg,,ggg,    ,ggg,,ggg,    ,ggg,     ,gggg,   I8   
+//      88    dP"  "Y8I  I8dP  d8            dP"  "Y8ggg,8" "8P" "8,  ,8" "8P" "8,  i8" "8i   dP"  "Yb  I8   
+//      88   i8'    ,8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,  
+//      88  ,d8,   ,d8b,,d8b,_ `Yba,,_____,,d8,   ,d8' ,dP   8I   Yb,,dP   8I   Yb, `YbadP' ,d8,_    _,d88b, 
+//      88  P"Y8888P"`Y88P'"Y88  `"Y8888888P"Y8888P"   8P'   8I   `Y88P'   8I   `Y8888P"Y888P""Y8888PP8P""Y8 
+// 
+//                                A Discord bot for PalWorld server monitoring
+// 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 
+// © Lily Ana Valley <hi@lilyvalley.dev>, 2025
+// 🪪 LICENSE: AGPL-3
+// 
+// PalConnect - A Discord bot for PalWorld server monitoring
+// Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
+//
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
+// details.
+// 
+// You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
+// <https://www.gnu.org/licenses/>.
+// 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// 
+/// PalConnect is a cross-server connector between a PalWorld dedicated server and a Discord server.
+/// Using the REST API of a PalWorld server, it's possible to administrate one's world and allow players to check on 
+/// their world from Discord.
+/// 
+/// 🚧 PalConnect is pre-release software until version `1.0.0` is published. Observations of bot instability, feature 
+/// changes and inconsistency is to be expected.
+/// 
+/// Leave your feedback on the [GitHub Repo](https://github.com/lilyanavalley/palconnect) to help improve this
+/// software.
+///
+// TODO: include documentation on *how* to use this app.
 
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpServer};
 use cargo_packager_updater;
 use clap::Parser;
 use fern;
@@ -8,21 +54,31 @@ use fork;
 use log::{debug, error, info, warn};
 use poise::serenity_prelude as serenity;
 use reqwest::Client;
-use serde::Deserialize;
 use std::fs;
 use std::io::Write;
+use std::sync::{Arc, Mutex};
 #[cfg(unix)]
 use syslog;
 use tokio::signal;
+use tokio_util::sync::CancellationToken;
 
 mod config;
 use config::*;
+mod glance;
+use glance::*;
+mod commands;
+use commands::*;
 mod health_check;
 use health_check::*;
+
+
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Context<'a> = poise::Context<'a, BotData, Error>;
 
 const UPDATE_ENDPOINT: &str =
     "https://github.com/lilyanavalley/palconnect/releases/download/updates";
 const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
+
 
 #[derive(Parser)]
 #[command(name = "palconnect")]
@@ -36,169 +92,11 @@ struct Args {
 }
 
 // Data structure that will be accessible in all command invocations
+#[derive(Clone)]
 pub struct BotData {
     http_client: Client,
     palworld_api_url: String,
     admin_password: String,
-}
-
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, BotData, Error>;
-
-// PalWorld API response structures
-#[derive(Debug, Deserialize)]
-struct ServerInfo {
-    version: String,
-    servername: String,
-    description: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct PlayersResponse {
-    players: Vec<Player>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Player {
-    name: String,
-    #[serde(rename = "playerId")]
-    player_id: String,
-    #[serde(rename = "userId")]
-    user_id: String,
-    ip: String,
-    ping: f64,
-    location_x: f64,
-    location_y: f64,
-    level: u32,
-}
-
-/// Show current player count on the PalWorld server
-#[poise::command(slash_command)]
-async fn players(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.defer().await?;
-
-    let data = ctx.data();
-    let url = format!("{}/v1/api/players", data.palworld_api_url);
-
-    match data
-        .http_client
-        .get(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .send()
-        .await
-    {
-        Ok(response) => match response.json::<PlayersResponse>().await {
-            Ok(players_data) => {
-                let player_count = players_data.players.len();
-                let player_list = if players_data.players.is_empty() {
-                    "No players currently online".to_string()
-                } else {
-                    players_data
-                        .players
-                        .iter()
-                        .map(|p| format!("• {} (Level {})", p.name, p.level))
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                };
-
-                let embed = serenity::CreateEmbed::new()
-                    .title("🎮 PalWorld Server Status")
-                    .field("Players Online", player_count.to_string(), true)
-                    .field("Player List", player_list, false)
-                    .color(if player_count > 0 { 0x00ff00 } else { 0xff0000 }) // Green if players online, red if none
-                    .timestamp(serenity::Timestamp::now());
-
-                ctx.send(poise::CreateReply::default().embed(embed)).await?;
-            }
-            Err(e) => {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to parse server response: {}", e))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
-        },
-        Err(e) => {
-            ctx.send(
-                poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
-                    .ephemeral(true),
-            )
-            .await?;
-        }
-    }
-
-    Ok(())
-}
-
-/// Show server information
-#[poise::command(slash_command)]
-async fn serverinfo(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.defer().await?;
-
-    let data = ctx.data();
-    let url = format!("{}/v1/api/info", data.palworld_api_url);
-
-    match data
-        .http_client
-        .get(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .send()
-        .await
-    {
-        Ok(response) => match response.json::<ServerInfo>().await {
-            Ok(server_info) => {
-                let embed = serenity::CreateEmbed::new()
-                    // TODO: Allow custom server info by selections
-                    .title("🏰 Server Information")
-                    .field("Server Name", &server_info.servername, true)
-                    .field("Version", &server_info.version, true)
-                    .field("Description", &server_info.description, false)
-                    .color(0x0099ff) // TODO: Allow custom color
-                    .timestamp(serenity::Timestamp::now());
-
-                ctx.send(poise::CreateReply::default().embed(embed)).await?;
-            }
-            Err(e) => {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to parse server response: {}", e))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
-        },
-        Err(e) => {
-            ctx.send(
-                poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
-                    .ephemeral(true),
-            )
-            .await?;
-        }
-    }
-
-    Ok(())
-}
-
-/// Show help information
-#[poise::command(slash_command)]
-async fn help(ctx: Context<'_>) -> Result<(), Error> {
-    let embed = serenity::CreateEmbed::new()
-        .title("🤖 PalConnect Bot Help")
-        .description("A Discord bot for monitoring your PalWorld dedicated server")
-        .field("/players", "Show current online players and count", false)
-        .field("/serverinfo", "Display server information", false)
-        .field("/help", "Show this help message", false)
-        .color(0x7289da)
-        .footer(serenity::CreateEmbedFooter::new(concat!(
-            "PalConnect Bot ",
-            env!("CARGO_PKG_VERSION")
-        )));
-
-    ctx.send(poise::CreateReply::default().embed(embed)).await?;
-    Ok(())
 }
 
 #[tokio::main]
@@ -321,35 +219,73 @@ async fn dispatcher() -> Result<(), Error> {
     info!("🚀 Starting PalConnect bot...");
     info!("📡 PalWorld API URL: {}", config.palworld_api_url);
 
+    // Store config values we need later before moving config
+    let heartbeat_port = config.heartbeat_port.unwrap_or(8080);
+    let discord_token = config.discord_token.clone();
+
+    // Create cancellation token and JoinHandle storage for graceful shutdown
+    let cancellation_token = CancellationToken::new();
+    let status_updater_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
+    let status_updater_handle_clone = status_updater_handle.clone();
+    let cancellation_token_clone = cancellation_token.clone();
+
     // * Setup Discord bot
     let framework_poise = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![players(), serverinfo(), help()],
+            commands: vec![
+                about(),
+                players(),
+                serverinfo(),
+                help(),
+                start(),
+                stop(),
+                forcestop(),
+                settings(),
+                metrics(),
+                announce(),
+                kick(),
+                ban(),
+                unban(),
+                save(),
+                update_status(),
+            ],
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {
             let palworld_api_url = config.palworld_api_url.clone();
             let admin_password = config.palworld_admin_password.clone();
+            let status_interval = config.status_update_interval();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(BotData {
+                
+                let bot_data = BotData {
                     http_client: Client::new(),
                     palworld_api_url,
                     admin_password,
-                })
+                };
+                
+                // Start the status updater background task with Arc-wrapped data
+                let ctx_arc = std::sync::Arc::new(ctx.clone());
+                let bot_data_arc = std::sync::Arc::new(bot_data.clone());
+                let handle = start_status_updater(ctx_arc, bot_data_arc, status_interval, cancellation_token_clone).await;
+                
+                // Store the JoinHandle for graceful shutdown
+                *status_updater_handle_clone.lock().unwrap() = Some(handle);
+                
+                Ok(bot_data)
             })
         })
         .build();
 
     let poise_intents = serenity::GatewayIntents::non_privileged();
-    let mut poise_client = serenity::ClientBuilder::new(config.discord_token, poise_intents)
+    let mut poise_client = serenity::ClientBuilder::new(discord_token, poise_intents)
         .framework(framework_poise)
         .await
         .expect("Failed to create Discord client");
 
     // * Setup Actix Web server
     let actix_server = HttpServer::new(|| App::new().service(health_check))
-        .bind(("0.0.0.0", config.heartbeat_port.unwrap_or(8080)))?
+        .bind(("0.0.0.0", heartbeat_port))?
         .run();
 
     info!("✅ Starting both Discord bot and health check server...");
@@ -366,6 +302,18 @@ async fn dispatcher() -> Result<(), Error> {
         }
         _ = signal::ctrl_c() => {
             info!("🛑 Received Ctrl+C, shutting down gracefully...");
+        }
+    }
+
+    // Cancel the status updater and wait for it to finish
+    info!("🛑 Cancelling status updater...");
+    cancellation_token.cancel();
+    
+    let handle = status_updater_handle.lock().unwrap().take();
+    if let Some(handle) = handle {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
+            Ok(_) => info!("✅ Status updater stopped gracefully"),
+            Err(_) => warn!("⚠️ Status updater did not stop within timeout"),
         }
     }
 

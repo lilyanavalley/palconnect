@@ -14,9 +14,23 @@
 // <https://www.gnu.org/licenses/>.
 // 
 
-use actix_web::{HttpResponse, Responder, get};
+pub mod about;
+pub use about::*;
 
-#[get("/health")]
-pub async fn health_check() -> impl Responder {
-    HttpResponse::Ok().body("OK")
-}
+pub mod help;
+pub use help::*;
+
+pub mod players;
+pub use players::*;
+
+pub mod server_info;
+pub use server_info::*;
+
+pub mod start_stop;
+pub use start_stop::*;
+
+pub mod admin_commands;
+pub use admin_commands::*;
+
+pub mod test_status;
+pub use test_status::*;

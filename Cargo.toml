@@ -1,12 +1,13 @@
 [package]
 name = "palconnect"
 authors = ["Lily Ana Valley <hi@lilyvalley.dev>"]
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 
 [dependencies]
 poise = "0.6"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "signal"] }
+tokio-util = "0.7"
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

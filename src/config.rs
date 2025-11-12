@@ -1,3 +1,18 @@
+// 
+// PalConnect - A Discord bot for PalWorld server monitoring
+// Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
+//
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
+// details.
+// 
+// You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
+// <https://www.gnu.org/licenses/>.
+// 
 
 use std::fs::File;
 use std::io::Read;
@@ -21,12 +36,17 @@ pub struct Config {
     pub palworld_admin_password:    String,             // * Required
     pub enable_autoupdate:          Option<bool>,
     pub heartbeat_port:             Option<u16>,
+    pub status_update_interval:     Option<u64>,        // * Status update interval in seconds
     pub logging:                    Option<Logging>,
 }
 
 impl Config {
     pub fn autoupdate(&self) -> bool {
         self.enable_autoupdate.unwrap_or(false)
+    }
+    
+    pub fn status_update_interval(&self) -> u64 {
+        self.status_update_interval.unwrap_or(30) // Default to 30 seconds
     }
 }
 
@@ -38,6 +58,7 @@ impl Default for Config {
             palworld_admin_password:    String::new(),
             enable_autoupdate:          None,
             heartbeat_port:             None,
+            status_update_interval:     None,
             logging:                    None,
         }
     }
@@ -105,6 +126,15 @@ pub fn setup() -> Config {
             )
             .expect("Failed to parse UPDATES_AUTO_ENABLE as bool")
         );
+    }
+
+    if let Ok(status_interval) = env::var("STATUS_UPDATE_INTERVAL") {
+        let interval = status_interval.parse::<u64>()
+            .expect("Failed to parse STATUS_UPDATE_INTERVAL as u64");
+        if interval < 15 {
+            panic!("STATUS_UPDATE_INTERVAL must be at least 15 seconds to avoid excessive API polling (got {}).", interval);
+        }
+        config.status_update_interval = Some(interval);
     }
 
     config
