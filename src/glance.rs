@@ -50,7 +50,7 @@ struct ServerInfo {
 }
 
 /// Start the background task that updates the bot's status with server information
-pub async fn start_status_updater(
+pub fn start_status_updater(
     ctx: Arc<serenity::Context>,
     bot_data: Arc<BotData>,
     update_interval_seconds: u64,
