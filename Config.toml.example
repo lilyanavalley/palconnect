@@ -1,5 +1,5 @@
 # PalConnect Configuration Example
-# This shows how to configure the new status update feature
+# Copy this file to Config.toml and modify the values below
 
 # Discord bot token (required)
 discord_token = "YOUR_DISCORD_BOT_TOKEN_HERE"
@@ -27,3 +27,49 @@ use_syslog = false
 use_stdout = true
 use_file = true
 use_file_path = "./log.txt"
+
+# Server management configuration (optional)
+# The service_type determines how PalConnect will start/stop the PalWorld server
+[server_management]
+
+# Service type options:
+# - "systemd" (Linux with systemd)
+# - "launchd" (macOS)
+# - "windowsservice" (Windows Services)  
+# - "powershell" (Windows PowerShell scripts)
+# - "customscript" (Custom commands/scripts)
+service_type = "systemd"
+
+# Examples for different platforms:
+
+# Linux systemd example (default):
+# service_type = "systemd"
+# service_name = "palworld.service"
+
+# macOS launchd example:
+# service_type = "launchd"
+# service_name = "/Library/LaunchDaemons/com.palworld.server.plist"
+
+# Windows Service example:
+# service_type = "windowsservice"
+# service_name = "PalWorldServer"
+
+# Windows PowerShell example:
+# service_type = "powershell"
+# start_command = "Start-Service -Name 'PalWorldServer'"
+# stop_command = "Stop-Service -Name 'PalWorldServer'"
+# force_stop_command = "Stop-Process -Name 'PalServer' -Force"
+
+# Custom script example (works on any platform):
+# service_type = "customscript"
+# start_command = "/usr/local/bin/start-palworld.sh"
+# stop_command = "/usr/local/bin/stop-palworld.sh"
+# force_stop_command = "/usr/local/bin/force-stop-palworld.sh"
+
+# For systemd (default on most Linux distributions):
+service_name = "palworld.service"
+
+# For custom scripts, you can specify the full command with arguments:
+# start_command = "docker start palworld-container"
+# stop_command = "docker stop palworld-container"  
+# force_stop_command = "docker kill palworld-container"

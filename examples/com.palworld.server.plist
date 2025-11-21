@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.palworld.server</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/PalWorld/PalServer</string>
+        <string>-port=8211</string>
+        <string>-players=32</string>
+    </array>
+    
+    <key>WorkingDirectory</key>
+    <string>/Applications/PalWorld</string>
+    
+    <key>UserName</key>
+    <string>palworld</string>
+    
+    <key>GroupName</key>
+    <string>staff</string>
+    
+    <key>KeepAlive</key>
+    <true/>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>StandardOutPath</key>
+    <string>/var/log/palworld.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/var/log/palworld_error.log</string>
+    
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
