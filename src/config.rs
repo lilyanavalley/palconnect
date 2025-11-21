@@ -38,6 +38,7 @@ pub struct Config {
     pub heartbeat_port:             Option<u16>,
     pub status_update_interval:     Option<u64>,        // * Status update interval in seconds
     pub logging:                    Option<Logging>,
+    pub server_management:          Option<ServerManagement>,
 }
 
 impl Config {
@@ -60,6 +61,7 @@ impl Default for Config {
             heartbeat_port:             None,
             status_update_interval:     None,
             logging:                    None,
+            server_management:          None,
         }
     }
 }
@@ -70,6 +72,49 @@ pub struct Logging {
     pub use_stdout: Option<bool>,
     pub use_file: Option<bool>,
     pub use_file_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ServerManagement {
+    pub service_type: ServiceType,
+    pub service_name: Option<String>,
+    pub start_command: Option<String>,
+    pub stop_command: Option<String>,
+    pub force_stop_command: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ServiceType {
+    Systemd,
+    Launchd,
+    WindowsService,
+    CustomScript,
+    PowerShell,
+}
+
+impl Default for ServerManagement {
+    fn default() -> Self {
+        #[cfg(target_os = "linux")]
+        let default_service_type = ServiceType::Systemd;
+        
+        #[cfg(target_os = "macos")]
+        let default_service_type = ServiceType::Launchd;
+        
+        #[cfg(target_os = "windows")]
+        let default_service_type = ServiceType::WindowsService;
+        
+        #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+        let default_service_type = ServiceType::CustomScript;
+
+        ServerManagement {
+            service_type: default_service_type,
+            service_name: None,
+            start_command: None,
+            stop_command: None,
+            force_stop_command: None,
+        }
+    }
 }
 
 pub fn setup() -> Config {

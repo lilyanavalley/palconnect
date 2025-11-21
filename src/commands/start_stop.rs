@@ -19,7 +19,6 @@ use poise::serenity_prelude::{self as serenity, CreateButton};
 use crate::{Context, Error};
 
 
-const PALWORLD_SYSTEMD_NAME: &str = "palworld.service";
 const PROMPT_TO_REBOOT: &str = "If you need to restart the server, please stop it first using `/stop` and then start it again using `/start`. (**Be careful, this will disconnect all players.**)";
 
 
@@ -46,19 +45,21 @@ pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     }
 
-    // Attempt to start the server.
-    // TODO: Allow choosing how to start the server (systemd, custom script, etc.)
-    let process = std::process::Command::new("systemctl")
-        .arg("start")
-        .arg(PALWORLD_SYSTEMD_NAME) // TODO: Allow custom service name
-        .status();
-
-    ctx.send(poise::CreateReply::default().content(
-        format!("✅ Initiated PalWorld server!\nStatus code: {}", process?.code().unwrap_or(-1)
-    ))).await?;
+    // Attempt to start the server using the service manager.
+    match data.service_manager.start_service().await {
+        Ok(message) => {
+            ctx.send(poise::CreateReply::default().content(
+                format!("✅ Initiated PalWorld server!\n{}", message)
+            )).await?;
+        }
+        Err(e) => {
+            ctx.send(poise::CreateReply::default().content(
+                format!("❌ Failed to start PalWorld server: {}", e)
+            )).await?;
+        }
+    }
 
     Ok(())
-
 }
 
 // TODO: Take shortened arguments for time (-t) and message (-m).
@@ -75,7 +76,7 @@ pub async fn stop(
     let client = &data.http_client;
 
     let shutdown_time: u64 = time.unwrap_or(60); // Default shutdown time
-    let mut shutdown_message: String = message.unwrap_or_else(|| "initiating shutdown via Discord".to_string());
+    let shutdown_message: String = message.unwrap_or_else(|| "initiating shutdown via Discord".to_string());
     // TODO: Limit length of custom message if needed.
 
     // Check if the server is already stopped.
@@ -182,20 +183,30 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
                     )
                 ).await?;
 
-                let stop_status = client
-                    .post(format!("{}/v1/api/stop", api_url))
-                    .basic_auth("admin", Some(&data.admin_password))
-                    .timeout(std::time::Duration::from_secs(3))
-                    .send()
-                    .await;
-
-                let stop_status_message = match stop_status {
-                    Ok(s) => format!("✅ PalWorld server has been force stopped. ({})", s.status()),
-                    Err(e) => match e.status() {
-                        Some(status) => format!("❌ Failed to force stop the PalWorld server. (HTTP status: {})", status),
-                        None => format!("❌ Failed to force stop the PalWorld server. (Error: {})", e.to_string()),
-                    },
+                // Try using the service manager's force stop method first
+                let stop_result = data.service_manager.force_stop_service().await;
+                
+                let stop_status_message = match stop_result {
+                    Ok(message) => format!("✅ PalWorld server has been force stopped via service manager.\n{}", message),
+                    Err(service_error) => {
+                        // If service manager fails, fallback to API stop
+                        match client
+                            .post(format!("{}/v1/api/stop", api_url))
+                            .basic_auth("admin", Some(&data.admin_password))
+                            .timeout(std::time::Duration::from_secs(3))
+                            .send()
+                            .await
+                        {
+                            Ok(s) => format!("✅ PalWorld server has been force stopped via API. ({})", s.status()),
+                            Err(api_error) => format!(
+                                "❌ Failed to force stop the PalWorld server.\nService manager error: {}\nAPI error: {}", 
+                                service_error, 
+                                api_error
+                            ),
+                        }
+                    }
                 };
+
                 ctx.send(
                     poise::CreateReply::default().content(stop_status_message)
                 ).await?;

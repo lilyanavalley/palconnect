@@ -20,6 +20,7 @@ chrono = "0.4.42"
 log = "0.4.28"
 fern = "0.7"
 clap = { version = "4.0", features = ["derive"] }
+async-trait = "0.1"
 
 [target.'cfg(unix)'.dependencies]
 syslog = "7.0.0"

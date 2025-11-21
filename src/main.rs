@@ -70,6 +70,9 @@ mod commands;
 use commands::*;
 mod health_check;
 use health_check::*;
+mod service_providers;
+mod service_manager;
+use service_manager::*;
 
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -97,6 +100,7 @@ pub struct BotData {
     http_client: Client,
     palworld_api_url: String,
     admin_password: String,
+    service_manager: ServiceManager,
 }
 
 #[tokio::main]
@@ -255,13 +259,18 @@ async fn dispatcher() -> Result<(), Error> {
             let palworld_api_url = config.palworld_api_url.clone();
             let admin_password = config.palworld_admin_password.clone();
             let status_interval = config.status_update_interval();
+            let server_management_config = config.server_management.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                
+                let service_manager = ServiceManager::new(server_management_config)
+                    .map_err(|e| format!("Failed to initialize service manager: {}", e))?;
                 
                 let bot_data = BotData {
                     http_client: Client::new(),
                     palworld_api_url,
                     admin_password,
+                    service_manager,
                 };
                 
                 // Start the status updater background task with Arc-wrapped data
