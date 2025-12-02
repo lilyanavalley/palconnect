@@ -5,6 +5,10 @@ root = true
 end_of_line = lf
 charset = utf-8
 
+[*.yaml]
+indent_size = 2
+insert_final_newline = true
+
 [*.{rs,md,sh}]
 indent_style = space
 indent_size = 4
