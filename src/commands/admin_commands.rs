@@ -456,13 +456,13 @@ fn sanitize_sensitive_data(mut value: serde_json::Value) -> serde_json::Value {
                 if sensitive_fields.iter().any(|&field| key.to_lowercase().contains(field)) {
                     *val = serde_json::Value::String("[REDACTED]".to_string());
                 } else {
-                    *val = sanitize_sensitive_data(val.clone());
+                    *val = sanitize_sensitive_data(std::mem::take(val));
                 }
             }
         }
         serde_json::Value::Array(arr) => {
             for item in arr.iter_mut() {
-                *item = sanitize_sensitive_data(item.clone());
+                *item = sanitize_sensitive_data(std::mem::take(item));
             }
         }
         _ => {} // Primitives don't need sanitization
