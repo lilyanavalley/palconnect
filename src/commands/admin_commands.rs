@@ -453,7 +453,7 @@ fn sanitize_sensitive_data(mut value: serde_json::Value) -> serde_json::Value {
             let sensitive_fields = ["AdminPassword", "admin_password", "password", "secret", "token", "key"];
             
             for (key, val) in map.iter_mut() {
-                if sensitive_fields.iter().any(|&field| key.to_lowercase().contains(&field.to_lowercase())) {
+                if sensitive_fields.iter().any(|&field| key.to_lowercase().contains(field)) {
                     *val = serde_json::Value::String("[REDACTED]".to_string());
                 } else {
                     *val = sanitize_sensitive_data(val.clone());
