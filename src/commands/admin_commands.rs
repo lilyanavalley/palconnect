@@ -19,6 +19,7 @@ use serde::Deserialize;
 
 use crate::{Context, Error};
 
+
 #[derive(Debug, Deserialize)]
 struct SettingsResponse {
     #[serde(flatten)]
@@ -50,24 +51,27 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
             if response.status().is_success() {
                 match response.json::<SettingsResponse>().await {
                     Ok(settings_data) => {
-                        // Format settings as JSON for better readability
-                        let settings_json = serde_json::to_string_pretty(&settings_data.settings)
-                            .unwrap_or_else(|_| "Failed to format settings".to_string());
 
-                        // Discord has a 1024 character limit for field values
-                        let truncated_settings = if settings_json.len() > 1000 {
-                            format!("{}...\n(truncated)", &settings_json[..1000])
-                        } else {
-                            settings_json
-                        };
+                        // * Admin password is stripped from the output for security reasons.
+                        // Even though the REST API doesn't return it, we double-check here in cases where it may be 
+                        // returned in the future...
+                        let sanitized_settings = sanitize_sensitive_data(settings_data.settings);
 
-                        let embed = serenity::CreateEmbed::new()
-                            .title("⚙️ PalWorld Server Settings")
-                            .description(format!("```json\n{}\n```", truncated_settings))
-                            .color(0x0099ff)
-                            .timestamp(serenity::Timestamp::now());
+                        ctx.send(
+                            poise::CreateReply::default().attachment(
+                                serenity::CreateAttachment::bytes(
+                                    serde_json::to_vec_pretty(&sanitized_settings)
+                                        .map_err(|e| format!("JSON serialization failed: {}", e))
+                                        .unwrap_or_else(|err| {
+                                            eprintln!("Settings serialization error: {}", err);
+                                            format!("Failed to serialize settings: {}", err).into_bytes()
+                                        }),
+                                    "palworld_settings.json",
+                                )
+                            )
+                        )
+                        .await?;
 
-                        ctx.send(poise::CreateReply::default().embed(embed)).await?;
                     }
                     Err(e) => {
                         ctx.send(
@@ -119,8 +123,11 @@ pub async fn metrics(ctx: Context<'_>) -> Result<(), Error> {
             if response.status().is_success() {
                 match response.json::<MetricsResponse>().await {
                     Ok(metrics_data) => {
+                        // Sanitize metrics data as well, in case it contains sensitive information
+                        let sanitized_metrics = sanitize_sensitive_data(metrics_data.metrics);
+                        
                         // Format metrics as JSON for better readability
-                        let metrics_json = serde_json::to_string_pretty(&metrics_data.metrics)
+                        let metrics_json = serde_json::to_string_pretty(&sanitized_metrics)
                             .unwrap_or_else(|_| "Failed to format metrics".to_string());
 
                         // Discord has a 1024 character limit for field values
@@ -435,4 +442,30 @@ pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+
+/// Recursively sanitize sensitive data from JSON values
+fn sanitize_sensitive_data(mut value: serde_json::Value) -> serde_json::Value {
+    match &mut value {
+        serde_json::Value::Object(map) => {
+            // List of sensitive field names to redact
+            let sensitive_fields = ["AdminPassword", "admin_password", "password", "secret", "token", "key"];
+            
+            for (key, val) in map.iter_mut() {
+                if sensitive_fields.iter().any(|&field| key.to_lowercase().contains(&field.to_lowercase())) {
+                    *val = serde_json::Value::String("[REDACTED]".to_string());
+                } else {
+                    *val = sanitize_sensitive_data(val.clone());
+                }
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                *item = sanitize_sensitive_data(item.clone());
+            }
+        }
+        _ => {} // Primitives don't need sanitization
+    }
+    value
 }
