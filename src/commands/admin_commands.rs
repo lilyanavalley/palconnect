@@ -61,7 +61,6 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
                             poise::CreateReply::default().attachment(
                                 serenity::CreateAttachment::bytes(
                                     serde_json::to_vec_pretty(&sanitized_settings)
-                                        .map_err(|e| format!("JSON serialization failed: {}", e))
                                         .unwrap_or_else(|err| {
                                             eprintln!("Settings serialization error: {}", err);
                                             format!("Failed to serialize settings: {}", err).into_bytes()
