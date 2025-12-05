@@ -443,19 +443,33 @@ pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+// * Values don't have to be lowercase btw, we lowercase them in the code for comparison.
+const SENSITIVE_FIELDS: &[&str] = &[
+    "adminpassword", "admin_password", "password", "passwd", "pwd",
+    "secret", "token", "key", "api_key", "apikey",
+    "auth", "authorization", "credential", "cred"
+];
 
 /// Recursively sanitize sensitive data from JSON values
-fn sanitize_sensitive_data(mut value: serde_json::Value) -> serde_json::Value {
-    match &mut value {
+fn sanitize_sensitive_data(mut jsonKP: serde_json::Value) -> serde_json::Value {
+    match &mut jsonKP {
         serde_json::Value::Object(map) => {
             // List of sensitive field names to redact
-            let sensitive_fields = ["AdminPassword", "admin_password", "password", "secret", "token", "key"];
-            
-            for (key, val) in map.iter_mut() {
-                if sensitive_fields.iter().any(|&field| key.to_lowercase().contains(field)) {
-                    *val = serde_json::Value::String("[REDACTED]".to_string());
+            for (key, value) in map.iter_mut() {
+                // Case-normalized key for comparison
+                let key_lc = key.to_lowercase();
+                // * Check if the key matches any sensitive field patterns
+                if SENSITIVE_FIELDS.iter().any(|&field| 
+                    key_lc == field ||
+                    key_lc.starts_with(&format!("{}_",&field)) ||
+                    key_lc.ends_with(&format!("_{}",field)) ||
+                    key_lc.ends_with(field)
+                ) {
+                    // * Stripping the value for sensitive fields
+                    *value = serde_json::Value::String("[REDACTED]".to_string());
                 } else {
-                    *val = sanitize_sensitive_data(std::mem::take(val));
+                    // * Leaving other values unchanged but sanitizing nested structures
+                    *value = sanitize_sensitive_data(std::mem::take(value));
                 }
             }
         }
@@ -466,5 +480,5 @@ fn sanitize_sensitive_data(mut value: serde_json::Value) -> serde_json::Value {
         }
         _ => {} // Primitives don't need sanitization
     }
-    value
+    jsonKP
 }
