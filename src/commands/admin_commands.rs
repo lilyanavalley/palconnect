@@ -473,7 +473,7 @@ fn sanitize_sensitive_data(mut jsonKP: serde_json::Value) -> serde_json::Value {
 
                 ) {
                     // * Stripping the value for sensitive fields
-                    *value = serde_json::Value::String("[REDACTED]".to_string());
+                    *value = serde_json::Value::String("▷ REDACTED ◁".to_string());
                 } else {
                     // * Leaving other values unchanged but sanitizing nested structures
                     *value = sanitize_sensitive_data(std::mem::take(value));
