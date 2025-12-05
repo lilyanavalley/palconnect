@@ -446,8 +446,8 @@ pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
 // * Values don't have to be lowercase btw, we lowercase them in the code for comparison.
 const SENSITIVE_FIELDS: &[&str] = &[
     "adminpassword", "admin_password", "password", "passwd", "pwd",
-    "secret", "token", "key", "api_key", "apikey",
-    "auth", "authorization", "credential", "cred"
+    "secret", "token", "key", "api", "api_key", "apikey",
+    "auth", "authorization", "credential", "cred", "rcon",
 ];
 
 /// Recursively sanitize sensitive data from JSON values
@@ -460,10 +460,17 @@ fn sanitize_sensitive_data(mut jsonKP: serde_json::Value) -> serde_json::Value {
                 let key_lc = key.to_lowercase();
                 // * Check if the key matches any sensitive field patterns
                 if SENSITIVE_FIELDS.iter().any(|&field| 
+                    
                     key_lc == field ||
+                    
+                    key_lc.starts_with(field) || 
                     key_lc.starts_with(&format!("{}_",&field)) ||
+                    key_lc.starts_with(&format!("{}-",field)) ||
+
                     key_lc.ends_with(&format!("_{}",field)) ||
+                    key_lc.ends_with(&format!("-{}",field)) ||
                     key_lc.ends_with(field)
+
                 ) {
                     // * Stripping the value for sensitive fields
                     *value = serde_json::Value::String("[REDACTED]".to_string());
