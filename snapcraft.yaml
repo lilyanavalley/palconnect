@@ -15,6 +15,9 @@ platforms:
 parts:
   pc:
     plugin: rust
+    rust-channel: stable
+    rust-features:
+      - no-autoupdate
     source: .
     source-type: local
     organize:
@@ -30,9 +33,6 @@ parts:
       ".env.example": /usr/src/palconnect/.env.example
     stage:
       - usr/
-    override-pull: |
-      craftctl default
-      craftctl set version="$CARGO_PKG_VERSION"
     build-packages:
       - pkg-config
       - build-essential

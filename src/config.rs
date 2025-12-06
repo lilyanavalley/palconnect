@@ -119,6 +119,7 @@ pub fn setup() -> Config {
         );
     }
 
+    // Check for autoupdate and status interval env vars
     if let Ok(update_enable) = env::var("UPDATES_AUTO_ENABLE") {
         config.enable_autoupdate = Some(
             <bool as std::str::FromStr>::from_str(
@@ -126,6 +127,13 @@ pub fn setup() -> Config {
             )
             .expect("Failed to parse UPDATES_AUTO_ENABLE as bool")
         );
+    }
+
+    // If the no-autoupdate feature is enabled, disable autoupdate, even if the config or env var says otherwise.
+    // This is a preventative measure for prebuilt packages that should not auto-update from within the app itself.
+    #[cfg(feature = "no-autoupdate")]
+    {
+        config.enable_autoupdate = Some(false);
     }
 
     if let Ok(status_interval) = env::var("STATUS_UPDATE_INTERVAL") {
