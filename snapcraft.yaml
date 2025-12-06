@@ -1,0 +1,43 @@
+name: palconnect
+base: core24
+adopt-info: pc
+summary: PalWorld Dedicated Server Discord Bot
+description: |
+  Bot for Discord using PalWorld REST API to provide active player information and administrative commands.
+
+grade: devel
+confinement: devmode
+
+platforms:
+  amd64:
+  arm64:
+
+parts:
+  pc:
+    plugin: rust
+    source: .
+    source-type: local
+    organize:
+      "target/**/palconnect": /usr/bin/palconnect
+      "src/": /usr/src/palconnect
+      "scripts/": /usr/src/palconnect/scripts
+      "systemd/": /usr/src/palconnect/systemd
+      "Cargo.lock": /usr/src/palconnect/Cargo.lock
+      "Cargo.toml": /usr/src/palconnect/Cargo.toml
+      "Config.toml.example": /usr/src/palconnect/Config.toml.example
+      "README.md": /usr/src/palconnect/README.md
+      "COPYING.md": /usr/src/palconnect/COPYING.md
+      ".env.example": /usr/src/palconnect/.env.example
+    stage:
+      - usr/
+    override-pull: |
+      craftctl default
+      craftctl set version="$CARGO_PKG_VERSION"
+    build-packages:
+      - pkg-config
+      - build-essential
+      - clang
+      - libssl-dev
+      - ca-certificates
+      - openssl
+      - protobuf-compiler

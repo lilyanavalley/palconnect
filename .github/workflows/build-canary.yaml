@@ -1,21 +1,14 @@
-name: Build
+name: Build Canary
 
 on:  
   workflow_call:
-    secrets:
-      CARGO_PACKAGER_SIGN_PRIVATE_KEY:
-        description: 'Private key for signing packages'
-        required: true
-      CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD:
-        description: 'Password for the private key'
-        required: true
     outputs:
       artifacts:
         description: "Build artifacts information"
         value: ${{ jobs.building.outputs.artifacts }}
   push:
-    tags:
-      - v*.*.*
+    branches:
+      - canary
 
 jobs:
 
@@ -60,10 +53,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Package application with sign
-        env:
-          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
-          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
+      - name: Package application without sign
         shell: bash
         run: |
           # * Workaround to handle MSI format with cargo-packager
@@ -72,19 +62,6 @@ jobs:
           else
             cargo packager --release --formats ${{ matrix.artifact_suffix }}
           fi
-
-      - name: Include signature files
-        run: |
-          ARTIFACTS=(target/release/*.${{ matrix.artifact_suffix }})
-          for artifact in "${ARTIFACTS[@]}"; do
-            if [ -f "${artifact}.sig" ]; then
-              echo "Including signature file for ${artifact}"
-            else
-              echo "Signature file not found for ${artifact}"
-              exit 1
-            fi
-          done
-        shell: bash
 
       - name: Set build info
         id: build-info
@@ -108,11 +85,4 @@ jobs:
         with:
           name: palconnect-${{ matrix.os }}-${{ matrix.artifact_suffix }}-${{ github.sha }}
           path: target/release/*.${{ matrix.artifact_suffix }}
-          retention-days: 30
-
-      - name: Upload signature artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: palconnect-${{ matrix.os }}-${{ matrix.artifact_suffix }}-${{ github.sha }}-signature
-          path: target/release/*.${{ matrix.artifact_suffix }}.sig
           retention-days: 30
