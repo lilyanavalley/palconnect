@@ -76,7 +76,7 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, BotData, Error>;
 
 const UPDATE_ENDPOINT: &str =
-    "https://github.com/lilyanavalley/palconnect/releases/download/updates";
+    "https://raw.githubusercontent.com/lilyanavalley/palconnect/refs/heads/live/.updater/latest.json";
 const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
 
 
