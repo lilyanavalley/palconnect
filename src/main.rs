@@ -70,13 +70,15 @@ mod commands;
 use commands::*;
 mod health_check;
 use health_check::*;
+mod service;
+pub use service::ServiceManager;
 
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, BotData, Error>;
 
 const UPDATE_ENDPOINT: &str =
-    "https://github.com/lilyanavalley/palconnect/releases/download/updates";
+    "https://raw.githubusercontent.com/lilyanavalley/palconnect/refs/heads/live/.updater/latest.json";
 const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
 
 
@@ -97,6 +99,46 @@ pub struct BotData {
     http_client: Client,
     palworld_api_url: String,
     admin_password: String,
+    pub palworld_service_name: String,
+    pub palworld_service_manager: String,
+}
+
+/// Handles the daemonization process on Unix platforms.
+/// Forks the process into a background daemon, writes a PID file, runs the dispatcher,
+/// and cleans up the PID file on exit.
+#[cfg(unix)]
+async fn handle_daemon_mode() -> Result<(), Error> {
+    info!("👹 Starting in daemon mode...");
+    match fork::daemon(false, false) {
+        Ok(fork::Fork::Child) => {
+            // We are in the child process (daemon)
+            let pid = std::process::id();
+            info!("🔧 Daemon process started with PID: {}", pid);
+
+            // Write PID file
+            if let Err(e) = write_pid_file(pid) {
+                warn!("⚠️ Failed to write PID file: {}", e);
+            }
+
+            let result = dispatcher().await;
+
+            // Clean up PID file on exit
+            if let Err(e) = remove_pid_file() {
+                warn!("⚠️ Failed to remove PID file: {}", e);
+            }
+
+            result.expect("Failed to run dispatcher in daemon mode");
+        }
+        Ok(fork::Fork::Parent(_child_pid)) => {
+            // We are in the parent process - exit cleanly
+            info!("🚀 Daemon started successfully");
+        }
+        Err(e) => {
+            error!("❌ Failed to daemonize: {}", e);
+            return Err(format!("Failed to daemonize: {}", e).into());
+        }
+    }
+    Ok(())
 }
 
 #[tokio::main]
@@ -124,37 +166,7 @@ async fn main() -> Result<(), Error> {
     {
         info!("🐧 Unix platform detected");
         if args.daemon {
-            info!("👹 Starting in daemon mode...");
-            match fork::daemon(false, false) {
-                Ok(fork::Fork::Child) => {
-                    // We are in the child process (daemon)
-                    let pid = std::process::id();
-                    info!("🔧 Daemon process started with PID: {}", pid);
-
-                    // Write PID file
-                    if let Err(e) = write_pid_file(pid) {
-                        warn!("⚠️ Failed to write PID file: {}", e);
-                    }
-
-                    let result = dispatcher().await;
-
-                    // Clean up PID file on exit
-                    if let Err(e) = remove_pid_file() {
-                        warn!("⚠️ Failed to remove PID file: {}", e);
-                    }
-
-                    result.expect("Failed to run dispatcher in daemon mode");
-                }
-                Ok(fork::Fork::Parent(_child_pid)) => {
-                    // We are in the parent process - exit cleanly
-                    info!("🚀 Daemon started successfully");
-                }
-                Err(e) => {
-                    error!("❌ Failed to daemonize: {}", e);
-                    return Err(format!("Failed to daemonize: {}", e).into());
-                }
-            }
-            return Ok(());
+            return handle_daemon_mode().await;
         } else {
             info!("🖥️ Running in foreground mode");
         }
@@ -169,11 +181,26 @@ async fn dispatcher() -> Result<(), Error> {
     let config = setup();
 
     // * Check for updates and apply if available
+    check_and_install_updates(&config).await;
+
+    info!("🚀 Starting PalConnect bot...");
+    info!("📡 PalWorld API URL: {}", config.palworld_api_url);
+
+    // Store config values we need later before moving config
+    let heartbeat_port = config.heartbeat_port.unwrap_or(8080);
+    let discord_token = config.discord_token.clone();
+
+    start_services(config, discord_token, heartbeat_port).await
+}
+
+/// Checks for available updates and installs them if autoupdate is enabled.
+/// Uses cargo-packager-updater to check for new versions and install them.
+async fn check_and_install_updates(config: &Config) {
     if config.autoupdate() {
         info!("🔄 Autoupdate enabled, checking online for newer copy...");
         info!("Current version number: {}", env!("CARGO_PKG_VERSION"));
 
-        let config = cargo_packager_updater::Config {
+        let updater_config = cargo_packager_updater::Config {
             endpoints: vec![UPDATE_ENDPOINT.parse().unwrap()],
             pubkey: UPDATE_PUBKEY.into(),
             ..Default::default()
@@ -181,7 +208,7 @@ async fn dispatcher() -> Result<(), Error> {
 
         match cargo_packager_updater::check_update(
             env!("CARGO_PKG_VERSION").parse().unwrap(),
-            config,
+            updater_config,
         ) {
             Ok(Some(update)) => {
                 info!("⬇️ Update found, downloading and installing...");
@@ -210,19 +237,19 @@ async fn dispatcher() -> Result<(), Error> {
                 error!("🔺 Failed to check for updates: {}, continuing startup", e);
             }
         }
-    }
-
-    if !config.autoupdate() {
+    } else {
         info!("⏸️ Autoupdate disabled, skipping update check");
     }
+}
 
-    info!("🚀 Starting PalConnect bot...");
-    info!("📡 PalWorld API URL: {}", config.palworld_api_url);
-
-    // Store config values we need later before moving config
-    let heartbeat_port = config.heartbeat_port.unwrap_or(8080);
-    let discord_token = config.discord_token.clone();
-
+/// Starts the Discord bot and Actix web server concurrently.
+/// Sets up the Discord bot with commands, starts a status updater background task,
+/// and runs the health check server. Handles graceful shutdown on Ctrl+C.
+async fn start_services(
+    config: Config,
+    discord_token: String,
+    heartbeat_port: u16,
+) -> Result<(), Error> {
     // Create cancellation token and JoinHandle storage for graceful shutdown
     let cancellation_token = CancellationToken::new();
     let status_updater_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
@@ -255,6 +282,8 @@ async fn dispatcher() -> Result<(), Error> {
             let palworld_api_url = config.palworld_api_url.clone();
             let admin_password = config.palworld_admin_password.clone();
             let status_interval = config.status_update_interval();
+            let palworld_service_name = config.palworld_service_name().to_string();
+            let palworld_service_manager = config.palworld_service_manager().to_string();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 
@@ -262,6 +291,8 @@ async fn dispatcher() -> Result<(), Error> {
                     http_client: Client::new(),
                     palworld_api_url,
                     admin_password,
+                    palworld_service_name,
+                    palworld_service_manager,
                 };
                 
                 // Start the status updater background task with Arc-wrapped data

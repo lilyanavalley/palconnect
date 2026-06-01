@@ -158,15 +158,18 @@ jobs:
             "platforms": {
               "linux-x86_64": {
                 "signature": "${{ steps.extract-signatures.outputs.linux_signature }}",
-                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-linux-x86_64.deb"
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-linux-x86_64.deb",
+                "format": "deb"
               },
               "darwin-x86_64": {
                 "signature": "${{ steps.extract-signatures.outputs.darwin_signature }}",
-                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-macos-x86_64.dmg"
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-macos-x86_64.dmg",
+                "format": "dmg"
               },
               "windows-x86_64": {
                 "signature": "${{ steps.extract-signatures.outputs.windows_signature }}",
-                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-windows-x86_64.msi"
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/palconnect-windows-x86_64.msi",
+                "format": "wix"
               }
             }
           }

@@ -38,6 +38,8 @@ pub struct Config {
     pub heartbeat_port:             Option<u16>,
     pub status_update_interval:     Option<u64>,        // * Status update interval in seconds
     pub logging:                    Option<Logging>,
+    pub palworld_service_name:      Option<String>,     // * OS service name for the PalWorld server
+    pub palworld_service_manager:   Option<String>,     // * Service manager: "systemd", "initd", or "none"
 }
 
 impl Config {
@@ -47,6 +49,14 @@ impl Config {
     
     pub fn status_update_interval(&self) -> u64 {
         self.status_update_interval.unwrap_or(30) // Default to 30 seconds
+    }
+
+    pub fn palworld_service_name(&self) -> &str {
+        self.palworld_service_name.as_deref().unwrap_or("palworld")
+    }
+
+    pub fn palworld_service_manager(&self) -> &str {
+        self.palworld_service_manager.as_deref().unwrap_or("systemd")
     }
 }
 
@@ -60,6 +70,8 @@ impl Default for Config {
             heartbeat_port:             None,
             status_update_interval:     None,
             logging:                    None,
+            palworld_service_name:      None,
+            palworld_service_manager:   None,
         }
     }
 }
@@ -119,6 +131,7 @@ pub fn setup() -> Config {
         );
     }
 
+    // Check for autoupdate and status interval env vars
     if let Ok(update_enable) = env::var("UPDATES_AUTO_ENABLE") {
         config.enable_autoupdate = Some(
             <bool as std::str::FromStr>::from_str(
@@ -128,6 +141,13 @@ pub fn setup() -> Config {
         );
     }
 
+    // If the no-autoupdate feature is enabled, disable autoupdate, even if the config or env var says otherwise.
+    // This is a preventative measure for prebuilt packages that should not auto-update from within the app itself.
+    #[cfg(feature = "no-autoupdate")]
+    {
+        config.enable_autoupdate = Some(false);
+    }
+
     if let Ok(status_interval) = env::var("STATUS_UPDATE_INTERVAL") {
         let interval = status_interval.parse::<u64>()
             .expect("Failed to parse STATUS_UPDATE_INTERVAL as u64");
@@ -135,6 +155,14 @@ pub fn setup() -> Config {
             panic!("STATUS_UPDATE_INTERVAL must be at least 15 seconds to avoid excessive API polling (got {}).", interval);
         }
         config.status_update_interval = Some(interval);
+    }
+
+    if let Ok(service_name) = env::var("PALWORLD_SERVICE_NAME") {
+        config.palworld_service_name = Some(service_name);
+    }
+
+    if let Ok(service_manager) = env::var("PALWORLD_SERVICE_MANAGER") {
+        config.palworld_service_manager = Some(service_manager);
     }
 
     config
