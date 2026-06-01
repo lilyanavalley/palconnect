@@ -1,0 +1,131 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          palconnect
+# Required-Start:    $network $remote_fs $syslog
+# Required-Stop:     $network $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: PalConnect Discord Bot
+# Description:       PalConnect - A Discord bot for PalWorld server monitoring
+### END INIT INFO
+
+# 
+# PalConnect - A Discord bot for PalWorld server monitoring
+# Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
+# 
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Affero General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+# 
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
+# details.
+# 
+# You should have received a copy of the GNU Affero General Public License along
+# with this program.  If not, see <https://www.gnu.org/licenses/>.
+# 
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+DESC="PalConnect Discord Bot"
+NAME=palconnect
+DAEMON=/opt/palconnect/palconnect
+DAEMON_ARGS=""
+PIDFILE=/var/run/$NAME.pid
+SCRIPTNAME=/etc/init.d/$NAME
+RUNAS=palconnect
+
+# Source function library (Debian/Ubuntu)
+[ -f /lib/lsb/init-functions ] && . /lib/lsb/init-functions
+
+# Source environment file
+ENVFILE=/etc/palconnect/palconnect.env
+[ -r "$ENVFILE" ] && . "$ENVFILE"
+
+# Ensure the daemon exists
+[ -x "$DAEMON" ] || { echo "$DAEMON not found or not executable"; exit 5; }
+
+do_start() {
+    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "$NAME is already running (PID $(cat $PIDFILE))"
+        return 1
+    fi
+    echo "Starting $DESC ($NAME)..."
+    start-stop-daemon --start --quiet \
+        --chuid "$RUNAS" \
+        --background \
+        --make-pidfile --pidfile "$PIDFILE" \
+        --exec "$DAEMON" -- $DAEMON_ARGS
+    RC=$?
+    if [ $RC -eq 0 ]; then
+        echo "$NAME started."
+    else
+        echo "Failed to start $NAME (exit code $RC)."
+    fi
+    return $RC
+}
+
+do_stop() {
+    if [ ! -f "$PIDFILE" ] || ! kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "$NAME is not running."
+        return 0
+    fi
+    echo "Stopping $DESC ($NAME)..."
+    start-stop-daemon --stop --quiet \
+        --pidfile "$PIDFILE" \
+        --retry TERM/30/KILL/5
+    RC=$?
+    rm -f "$PIDFILE"
+    if [ $RC -eq 0 ]; then
+        echo "$NAME stopped."
+    else
+        echo "Failed to stop $NAME (exit code $RC)."
+    fi
+    return $RC
+}
+
+do_status() {
+    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "$NAME is running (PID $(cat $PIDFILE))."
+        return 0
+    else
+        echo "$NAME is not running."
+        return 3
+    fi
+}
+
+do_reload() {
+    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        echo "Reloading $DESC ($NAME)..."
+        kill -HUP "$(cat "$PIDFILE")"
+        return $?
+    fi
+    echo "$NAME is not running."
+    return 7
+}
+
+case "$1" in
+    start)
+        do_start
+        ;;
+    stop)
+        do_stop
+        ;;
+    status)
+        do_status
+        ;;
+    restart|force-reload)
+        do_stop
+        do_start
+        ;;
+    reload)
+        do_reload
+        ;;
+    *)
+        echo "Usage: $SCRIPTNAME {start|stop|status|restart|reload|force-reload}" >&2
+        exit 3
+        ;;
+esac
+
+exit $?

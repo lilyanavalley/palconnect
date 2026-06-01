@@ -21,6 +21,19 @@ heartbeat_port = 8080
 # with the current player count from your PalWorld server
 status_update_interval = 30
 
+# OS service manager used to start/stop the PalWorld server process (optional)
+# Supported values: "systemd" (default), "initd", "none"
+#   systemd — uses `systemctl start/kill` (Linux with systemd)
+#   initd   — uses `/etc/init.d/<name> start/stop` (SysV init / OpenRC)
+#   none    — disables OS service control; /start and /forcestop fall back to
+#             the PalWorld REST API only
+palworld_service_manager = "systemd"
+
+# Name of the PalWorld OS service unit (optional, default: "palworld")
+# For systemd this is typically "palworld.service"; for init.d it is the
+# script name under /etc/init.d (e.g. "palworld").
+palworld_service_name = "palworld"
+
 [logging]
 # Logging configuration (optional)
 use_syslog = false

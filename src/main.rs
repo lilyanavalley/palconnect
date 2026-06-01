@@ -70,6 +70,8 @@ mod commands;
 use commands::*;
 mod health_check;
 use health_check::*;
+mod service;
+pub use service::ServiceManager;
 
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -97,6 +99,8 @@ pub struct BotData {
     http_client: Client,
     palworld_api_url: String,
     admin_password: String,
+    pub palworld_service_name: String,
+    pub palworld_service_manager: String,
 }
 
 /// Handles the daemonization process on Unix platforms.
@@ -278,6 +282,8 @@ async fn start_services(
             let palworld_api_url = config.palworld_api_url.clone();
             let admin_password = config.palworld_admin_password.clone();
             let status_interval = config.status_update_interval();
+            let palworld_service_name = config.palworld_service_name().to_string();
+            let palworld_service_manager = config.palworld_service_manager().to_string();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 
@@ -285,6 +291,8 @@ async fn start_services(
                     http_client: Client::new(),
                     palworld_api_url,
                     admin_password,
+                    palworld_service_name,
+                    palworld_service_manager,
                 };
                 
                 // Start the status updater background task with Arc-wrapped data

@@ -16,10 +16,9 @@
 
 use poise::serenity_prelude::{self as serenity, CreateButton};
 
-use crate::{Context, Error};
+use crate::{Context, Error, ServiceManager};
 
 
-const PALWORLD_SYSTEMD_NAME: &str = "palworld.service";
 const PROMPT_TO_REBOOT: &str = "If you need to restart the server, please stop it first using `/stop` and then start it again using `/start`. (**Be careful, this will disconnect all players.**)";
 
 
@@ -46,16 +45,40 @@ pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     }
 
-    // Attempt to start the server.
-    // TODO: Allow choosing how to start the server (systemd, custom script, etc.)
-    let process = std::process::Command::new("systemctl")
-        .arg("start")
-        .arg(PALWORLD_SYSTEMD_NAME) // TODO: Allow custom service name
-        .status();
+    let service_manager = ServiceManager::from_str(&data.palworld_service_manager);
+    let service_name = &data.palworld_service_name;
 
-    ctx.send(poise::CreateReply::default().content(
-        format!("✅ Initiated PalWorld server!\nStatus code: {}", process?.code().unwrap_or(-1)
-    ))).await?;
+    if !service_manager.is_capable() {
+        ctx.say("⚠️ No OS service manager is configured (`palworld_service_manager = \"none\"`). Cannot start the server via a service unit.").await?;
+        return Ok(());
+    }
+
+    // Attempt to start the server via the configured OS service manager.
+    #[cfg(unix)]
+    {
+        let result = service_manager.start(service_name);
+        let exit_code = match result {
+            Ok(code) => code,
+            Err(e) => {
+                ctx.say(format!("❌ Failed to invoke the {} service manager: {}", service_manager.label(), e)).await?;
+                return Ok(());
+            }
+        };
+
+        ctx.send(poise::CreateReply::default().content(
+            format!(
+                "✅ Initiated PalWorld server via {} (`{}`).\nExit code: {}",
+                service_manager.label(),
+                service_name,
+                exit_code
+            )
+        )).await?;
+    }
+
+    #[cfg(not(unix))]
+    {
+        ctx.say("⚠️ OS service management is only supported on Unix/Linux platforms.").await?;
+    }
 
     Ok(())
 
@@ -75,7 +98,7 @@ pub async fn stop(
     let client = &data.http_client;
 
     let shutdown_time: u64 = time.unwrap_or(60); // Default shutdown time
-    let mut shutdown_message: String = message.unwrap_or_else(|| "initiating shutdown via Discord".to_string());
+    let shutdown_message: String = message.unwrap_or_else(|| "initiating shutdown via Discord".to_string());
     // TODO: Limit length of custom message if needed.
 
     // Check if the server is already stopped.
@@ -121,7 +144,7 @@ pub async fn stop(
 
 }
 
-/// Force stop the server
+/// Force stop the server immediately via the OS service unit (SIGKILL)
 #[poise::command(slash_command)]
 pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
 
@@ -144,6 +167,19 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     }
 
+    let service_manager = ServiceManager::from_str(&data.palworld_service_manager);
+    let service_name = data.palworld_service_name.clone();
+
+    let manager_note = if service_manager.is_capable() {
+        format!(
+            "\n> The process will be killed via the **{}** service manager (`{}`).",
+            service_manager.label(),
+            service_name
+        )
+    } else {
+        "\n> ⚠️ No OS service manager is configured — the PalWorld REST API `/stop` endpoint will be used instead.".to_string()
+    };
+
     // Build a warning button and send it to the user.
     let confirm_button = CreateButton::new("force_stop_confirm")
         .emoji(serenity::ReactionType::Unicode("🔥".to_string()))
@@ -152,7 +188,9 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
 
     let reply = ctx.send(
         poise::CreateReply::default().content(
-            "🔥 **Warning:** This will immediately terminate the PalWorld server process, which may lead to data loss. All connected players will be immediately disconnected.\n\nAre you sure you want to proceed?"
+            format!(
+                "🔥 **Warning:** This will immediately terminate the PalWorld server process, which may lead to data loss. All connected players will be immediately disconnected.{manager_note}\n\nAre you sure you want to proceed?"
+            )
         ).components(
             vec![serenity::CreateActionRow::Buttons(vec![
                 confirm_button
@@ -182,20 +220,8 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
                     )
                 ).await?;
 
-                let stop_status = client
-                    .post(format!("{}/v1/api/stop", api_url))
-                    .basic_auth("admin", Some(&data.admin_password))
-                    .timeout(std::time::Duration::from_secs(3))
-                    .send()
-                    .await;
+                let stop_status_message = force_stop_server(client, api_url, &data.admin_password, &service_manager, &service_name).await;
 
-                let stop_status_message = match stop_status {
-                    Ok(s) => format!("✅ PalWorld server has been force stopped. ({})", s.status()),
-                    Err(e) => match e.status() {
-                        Some(status) => format!("❌ Failed to force stop the PalWorld server. (HTTP status: {})", status),
-                        None => format!("❌ Failed to force stop the PalWorld server. (Error: {})", e.to_string()),
-                    },
-                };
                 ctx.send(
                     poise::CreateReply::default().content(stop_status_message)
                 ).await?;
@@ -214,3 +240,57 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 
 }
+
+/// Performs the actual force-stop, preferring OS service unit kill over the REST API.
+async fn force_stop_server(
+    client: &reqwest::Client,
+    api_url: &str,
+    admin_password: &str,
+    service_manager: &ServiceManager,
+    service_name: &str,
+) -> String {
+    // Prefer killing the process via the OS service manager when available.
+    #[cfg(unix)]
+    if service_manager.is_capable() {
+        return match service_manager.force_stop(service_name) {
+            Ok(code) if code == 0 => {
+                format!(
+                    "✅ PalWorld server has been force stopped via {} (`{}`).",
+                    service_manager.label(),
+                    service_name
+                )
+            }
+            Ok(code) => {
+                format!(
+                    "⚠️ Force stop via {} returned exit code {}. The server may still be running.",
+                    service_manager.label(),
+                    code
+                )
+            }
+            Err(e) => {
+                format!(
+                    "❌ Failed to force stop via {}: {}. Falling back to REST API.",
+                    service_manager.label(),
+                    e
+                )
+            }
+        };
+    }
+
+    // Fallback: use the PalWorld REST API /stop endpoint.
+    let stop_status = client
+        .post(format!("{}/v1/api/stop", api_url))
+        .basic_auth("admin", Some(admin_password))
+        .timeout(std::time::Duration::from_secs(3))
+        .send()
+        .await;
+
+    match stop_status {
+        Ok(s) => format!("✅ PalWorld server has been force stopped via REST API. ({})", s.status()),
+        Err(e) => match e.status() {
+            Some(status) => format!("❌ Failed to force stop the PalWorld server. (HTTP status: {})", status),
+            None => format!("❌ Failed to force stop the PalWorld server. (Error: {})", e),
+        },
+    }
+}
+
