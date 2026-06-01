@@ -168,7 +168,7 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     let service_manager = ServiceManager::from_str(&data.palworld_service_manager);
-    let service_name = data.palworld_service_name.clone();
+    let service_name = &data.palworld_service_name;
 
     let manager_note = if service_manager.is_capable() {
         format!(
@@ -220,7 +220,7 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
                     )
                 ).await?;
 
-                let stop_status_message = force_stop_server(client, api_url, &data.admin_password, &service_manager, &service_name).await;
+                let stop_status_message = force_stop_server(client, api_url, &data.admin_password, &service_manager, service_name).await;
 
                 ctx.send(
                     poise::CreateReply::default().content(stop_status_message)

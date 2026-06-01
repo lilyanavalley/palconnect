@@ -56,7 +56,7 @@ impl ServiceManager {
             }
             ServiceManager::InitD => {
                 log::info!("▶️ Starting '{}' via /etc/init.d", service_name);
-                std::process::Command::new("/etc/init.d/".to_string() + service_name)
+                std::process::Command::new(format!("/etc/init.d/{}", service_name))
                     .arg("start")
                     .status()?
             }
@@ -82,7 +82,7 @@ impl ServiceManager {
             }
             ServiceManager::InitD => {
                 log::info!("⏹️ Stopping '{}' via /etc/init.d", service_name);
-                std::process::Command::new("/etc/init.d/".to_string() + service_name)
+                std::process::Command::new(format!("/etc/init.d/{}", service_name))
                     .arg("stop")
                     .status()?
             }
@@ -114,7 +114,7 @@ impl ServiceManager {
             ServiceManager::InitD => {
                 log::info!("🔥 Force-killing '{}' via init.d + SIGKILL", service_name);
                 // First attempt a normal stop so the init script cleans up
-                let _ = std::process::Command::new("/etc/init.d/".to_string() + service_name)
+                let _ = std::process::Command::new(format!("/etc/init.d/{}", service_name))
                     .arg("stop")
                     .status();
                 // Then SIGKILL any surviving process from the PID file
