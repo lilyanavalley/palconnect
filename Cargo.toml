@@ -23,7 +23,7 @@ clap = { version = "4.0", features = ["derive"] }
 
 [target.'cfg(unix)'.dependencies]
 syslog = "7.0.0"
-fork = "0.7.0"
+fork = "0.8.0"
 
 [features]
 default = []
