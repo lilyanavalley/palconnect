@@ -195,14 +195,14 @@ pub fn setup() -> Config {
     if let Ok(val) = env::var("MULTI_TENANT") {
         config.multi_tenant = Some(
             val.to_lowercase().parse::<bool>()
-                .expect("Failed to parse MULTI_TENANT as bool"),
+                .expect("Failed to parse MULTI_TENANT as bool. Expected 'true' or 'false'"),
         );
     }
 
     if let Ok(val) = env::var("INVITE_ENABLED") {
         config.invite_enabled = Some(
             val.to_lowercase().parse::<bool>()
-                .expect("Failed to parse INVITE_ENABLED as bool"),
+                .expect("Failed to parse INVITE_ENABLED as bool. Expected 'true' or 'false'"),
         );
     }
     
