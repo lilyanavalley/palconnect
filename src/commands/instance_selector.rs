@@ -48,6 +48,9 @@ impl InstanceTarget {
 
 // ─── Picker ───────────────────────────────────────────────────────────────────
 
+/// Discord API maximum number of options in a select menu component.
+const DISCORD_SELECT_MENU_MAX_OPTIONS: usize = 25;
+
 /// Present an ephemeral instance picker and wait for the user to choose.
 ///
 /// * **1 instance** — returns immediately with `InstanceTarget::Single`; no UI shown.
@@ -102,7 +105,7 @@ pub async fn prompt_mutating_target(
             .collect();
         options.push(serenity::CreateSelectMenuOption::new("All Servers", &all_id));
 
-        let max = (instances.len() + 1).min(25) as u8;
+        let max = (instances.len() + 1).min(DISCORD_SELECT_MENU_MAX_OPTIONS) as u8;
         vec![serenity::CreateActionRow::SelectMenu(
             serenity::CreateSelectMenu::new(
                 format!("inst_select:{nonce}"),

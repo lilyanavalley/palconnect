@@ -97,8 +97,9 @@ async fn start_single(ctx: Context<'_>, instance: &PalworldInstance) -> Result<(
 /// # Note
 /// The systemd service name is currently hardcoded to `palworld.service` for all instances.
 /// Per-instance service name configuration is tracked as a TODO for a future release.
-async fn start_instance(_instance: &PalworldInstance) -> String {
-    // TODO: Allow custom service name per instance
+#[allow(unused_variables)]
+async fn start_instance(instance: &PalworldInstance) -> String {
+    // TODO: Allow custom service name per instance (use instance.display_name or a new field)
     let process = std::process::Command::new("systemctl")
         .arg("start")
         .arg(PALWORLD_SYSTEMD_NAME)
