@@ -14,6 +14,8 @@
 // <https://www.gnu.org/licenses/>.
 // 
 
+pub mod instance_selector;
+
 pub mod about;
 pub use about::*;
 
