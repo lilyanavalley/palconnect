@@ -95,14 +95,14 @@ pub fn resolve_tenant_and_instance(
 ) -> Result<(Tenant, PalworldInstance), String> {
     let tenant = store
         .get_tenant_for_guild(guild_id)
-        .ok_or_else(|| "⚠️ This server has not been set up yet. Please configure PalConnect via the setup flow.".to_string())?;
+        .ok_or_else(|| "⚠️ This server has not been configured yet. Please contact your administrator.".to_string())?;
 
     if !tenant.enabled {
         return Err("⚠️ PalConnect is currently disabled for this server.".to_string());
     }
 
     let instance = resolve_primary_instance(store, tenant.id)
-        .ok_or_else(|| "⚠️ No PalWorld server has been configured for this Discord server. Add one via the setup flow.".to_string())?;
+        .ok_or_else(|| "⚠️ No PalWorld server has been configured for this Discord server. Please contact your administrator.".to_string())?;
 
     Ok((tenant, instance))
 }

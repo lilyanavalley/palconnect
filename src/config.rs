@@ -28,6 +28,9 @@ const CONFIG_LOCATIONS: [&str; 3] = [
     "/usr/local/etc/palconnect/Config.toml",
 ];
 
+/// Default PalWorld REST API URL used when no explicit URL is configured.
+const DEFAULT_PALWORLD_API_URL: &str = "http://localhost:8212";
+
 // ─── PalWorld server entry ────────────────────────────────────────────────────
 
 /// A single PalWorld dedicated-server definition.
@@ -114,7 +117,7 @@ impl Config {
             }
         }
         // Legacy fallback
-        let url = self.palworld_api_url.clone().unwrap_or_else(|| "http://localhost:8212".to_string());
+        let url = self.palworld_api_url.clone().unwrap_or_else(|| DEFAULT_PALWORLD_API_URL.to_string());
         let password = self.palworld_admin_password.clone().unwrap_or_default();
         vec![PalworldServerConfig {
             name: "PalWorld Server".to_string(),

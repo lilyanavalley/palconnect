@@ -34,6 +34,13 @@ impl AuthzGuard {
     ///
     /// Returns `Ok(())` when access is granted, or an `Err` with a user-facing message when
     /// denied.  Phase 1 always returns `Ok(())`.
+    ///
+    /// # Arguments
+    /// * `guild_id` — The Discord guild ID of the command invocation context; `None` in DMs.
+    /// * `user_id` — The Discord user ID of the command caller.
+    /// * `command_name` — The slash-command name being invoked (e.g. `"kick"`, `"announce"`).
+    /// * `instance_id` — The ID of the `PalworldInstance` the command targets; used in Phase 5
+    ///   to enforce per-instance, per-command-group role policies.
     pub async fn check(
         &self,
         _guild_id: Option<u64>,
