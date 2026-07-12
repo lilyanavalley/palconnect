@@ -14,23 +14,28 @@
 // <https://www.gnu.org/licenses/>.
 // 
 
-use poise::serenity_prelude as serenity;
-use serde::Deserialize;
+// 
+// PalConnect - A Discord bot for PalWorld server monitoring
+// Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
+//
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
+// details.
+// 
+// You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
+// <https://www.gnu.org/licenses/>.
+// 
 
+use poise::serenity_prelude as serenity;
+
+use crate::services::resolve_tenant_and_instance;
+use crate::utils::sanitize_sensitive_data;
 use crate::{Context, Error};
 
-
-#[derive(Debug, Deserialize)]
-struct SettingsResponse {
-    #[serde(flatten)]
-    settings: serde_json::Value,
-}
-
-#[derive(Debug, Deserialize)]
-struct MetricsResponse {
-    #[serde(flatten)]
-    metrics: serde_json::Value,
-}
 
 /// Print PalWorld server settings
 #[poise::command(slash_command)]
@@ -38,62 +43,36 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
 
     let data = ctx.data();
-    let url = format!("{}/v1/api/settings", data.palworld_api_url);
+    let guild_id = ctx.guild_id().map(|g| g.get());
+    let (_tenant, instance) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true)).await?;
+            return Ok(());
+        }
+    };
 
-    match data
-        .http_client
-        .get(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                match response.json::<SettingsResponse>().await {
-                    Ok(settings_data) => {
-
-                        // * Admin password is stripped from the output for security reasons.
-                        // Even though the REST API doesn't return it, we double-check here in cases where it may be 
-                        // returned in the future...
-                        let sanitized_settings = sanitize_sensitive_data(settings_data.settings);
-
-                        ctx.send(
-                            poise::CreateReply::default().attachment(
-                                serenity::CreateAttachment::bytes(
-                                    serde_json::to_vec_pretty(&sanitized_settings)
-                                        .unwrap_or_else(|err| {
-                                            eprintln!("Settings serialization error: {}", err);
-                                            format!("Failed to serialize settings: {}", err).into_bytes()
-                                        }),
-                                    "palworld_settings.json",
-                                )
-                            )
-                        )
-                        .await?;
-
-                    }
-                    Err(e) => {
-                        ctx.send(
-                            poise::CreateReply::default()
-                                .content(format!("❌ Failed to parse settings response: {}", e))
-                                .ephemeral(true),
-                        )
-                        .await?;
-                    }
-                }
-            } else {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to get settings. Status: {}", response.status()))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
+    match data.palworld_client.get_settings(&instance).await {
+        Ok(raw_settings) => {
+            // Sanitize before returning to chat — belt-and-suspenders even though the PalWorld
+            // REST API doesn't return admin credentials.
+            let sanitized = sanitize_sensitive_data(raw_settings);
+            ctx.send(
+                poise::CreateReply::default().attachment(
+                    serenity::CreateAttachment::bytes(
+                        serde_json::to_vec_pretty(&sanitized).unwrap_or_else(|err| {
+                            format!("Failed to serialize settings: {}", err).into_bytes()
+                        }),
+                        "palworld_settings.json",
+                    ),
+                ),
+            )
+            .await?;
         }
         Err(e) => {
             ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
+                    .content(format!("❌ Failed to reach **{}**: {}", instance.display_name, e))
                     .ephemeral(true),
             )
             .await?;
@@ -109,63 +88,35 @@ pub async fn metrics(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
 
     let data = ctx.data();
-    let url = format!("{}/v1/api/metrics", data.palworld_api_url);
+    let guild_id = ctx.guild_id().map(|g| g.get());
+    let (_tenant, instance) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true)).await?;
+            return Ok(());
+        }
+    };
 
-    match data
-        .http_client
-        .get(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                match response.json::<MetricsResponse>().await {
-                    Ok(metrics_data) => {
-                        // Sanitize metrics data as well, in case it contains sensitive information
-                        let sanitized_metrics = sanitize_sensitive_data(metrics_data.metrics);
-                        
-                        // Format metrics as JSON for better readability
-                        let metrics_json = serde_json::to_string_pretty(&sanitized_metrics)
-                            .unwrap_or_else(|_| "Failed to format metrics".to_string());
+    match data.palworld_client.get_metrics(&instance).await {
+        Ok(m) => {
+            let metrics_text = format!(
+                "```\nPlayers:    {}/{}\nUptime:     {}s ({} days)\nServer FPS: {}\nFrame Time: {:.2}ms\n```",
+                m.current_player_num, m.max_player_num,
+                m.uptime, m.days,
+                m.server_fps, m.server_frame_time
+            );
+            let embed = serenity::CreateEmbed::new()
+                .title(format!("📊 {} — Metrics", instance.display_name))
+                .description(metrics_text)
+                .color(0x00ff00)
+                .timestamp(serenity::Timestamp::now());
 
-                        // Discord has a 1024 character limit for field values
-                        let truncated_metrics = if metrics_json.len() > 1000 {
-                            format!("{}...\n(truncated)", &metrics_json[..1000])
-                        } else {
-                            metrics_json
-                        };
-
-                        let embed = serenity::CreateEmbed::new()
-                            .title("📊 PalWorld Server Metrics")
-                            .description(format!("```json\n{}\n```", truncated_metrics))
-                            .color(0x00ff00)
-                            .timestamp(serenity::Timestamp::now());
-
-                        ctx.send(poise::CreateReply::default().embed(embed)).await?;
-                    }
-                    Err(e) => {
-                        ctx.send(
-                            poise::CreateReply::default()
-                                .content(format!("❌ Failed to parse metrics response: {}", e))
-                                .ephemeral(true),
-                        )
-                        .await?;
-                    }
-                }
-            } else {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to get metrics. Status: {}", response.status()))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
+            ctx.send(poise::CreateReply::default().embed(embed)).await?;
         }
         Err(e) => {
             ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
+                    .content(format!("❌ Failed to reach **{}**: {}", instance.display_name, e))
                     .ephemeral(true),
             )
             .await?;
@@ -184,39 +135,27 @@ pub async fn announce(
     ctx.defer().await?;
 
     let data = ctx.data();
-    let url = format!("{}/v1/api/announce", data.palworld_api_url);
+    let guild_id = ctx.guild_id().map(|g| g.get());
+    let (_tenant, instance) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true)).await?;
+            return Ok(());
+        }
+    };
 
-    match data
-        .http_client
-        .post(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .header("Content-Type", "application/json")
-        .body(serde_json::json!({ "message": message }).to_string())
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("📢 Announcement sent: \"{}\"", message)),
-                )
-                .await?;
-            } else {
-                let status = response.status();
-                let body = response.text().await.unwrap_or_else(|_| "<failed to read response body>".to_string());
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to send announcement. Status: {}. Response: {}", status, body))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
+    match data.palworld_client.announce(&instance, &message).await {
+        Ok(()) => {
+            ctx.send(
+                poise::CreateReply::default()
+                    .content(format!("📢 Announcement sent to **{}**: \"{}\"", instance.display_name, message)),
+            )
+            .await?;
         }
         Err(e) => {
             ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
+                    .content(format!("❌ Failed to announce on **{}**: {}", instance.display_name, e))
                     .ephemeral(true),
             )
             .await?;
@@ -236,47 +175,29 @@ pub async fn kick(
     ctx.defer().await?;
 
     let data = ctx.data();
-    let url = format!("{}/v1/api/kick", data.palworld_api_url);
+    let guild_id = ctx.guild_id().map(|g| g.get());
+    let (_tenant, instance) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true)).await?;
+            return Ok(());
+        }
+    };
 
     let kick_message = message.unwrap_or_else(|| "Kicked by admin".to_string());
 
-    match data
-        .http_client
-        .post(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .header("Content-Type", "application/json")
-        .body(
-            serde_json::json!({
-                "userid": userid,
-                "message": kick_message
-            })
-            .to_string(),
-        )
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("👢 Player `{}` has been kicked. Reason: \"{}\"", userid, kick_message)),
-                )
-                .await?;
-            } else {
-                let status = response.status();
-                let body = response.text().await.unwrap_or_else(|_| "<failed to read response body>".to_string());
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to kick player. Status: {}. Response: {}", status, body))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
+    match data.palworld_client.kick(&instance, &userid, &kick_message).await {
+        Ok(()) => {
+            ctx.send(
+                poise::CreateReply::default()
+                    .content(format!("👢 Player `{}` has been kicked from **{}**. Reason: \"{}\"", userid, instance.display_name, kick_message)),
+            )
+            .await?;
         }
         Err(e) => {
             ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
+                    .content(format!("❌ Failed to kick on **{}**: {}", instance.display_name, e))
                     .ephemeral(true),
             )
             .await?;
@@ -296,47 +217,29 @@ pub async fn ban(
     ctx.defer().await?;
 
     let data = ctx.data();
-    let url = format!("{}/v1/api/ban", data.palworld_api_url);
+    let guild_id = ctx.guild_id().map(|g| g.get());
+    let (_tenant, instance) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true)).await?;
+            return Ok(());
+        }
+    };
 
     let ban_message = message.unwrap_or_else(|| "Banned by admin".to_string());
 
-    match data
-        .http_client
-        .post(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .header("Content-Type", "application/json")
-        .body(
-            serde_json::json!({
-                "userid": userid,
-                "message": ban_message
-            })
-            .to_string(),
-        )
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("🔨 Player `{}` has been banned. Reason: \"{}\"", userid, ban_message)),
-                )
-                .await?;
-            } else {
-                let status = response.status();
-                let body = response.text().await.unwrap_or_else(|_| "<failed to read response body>".to_string());
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to ban player. Status: {}. Response: {}", status, body))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
+    match data.palworld_client.ban(&instance, &userid, &ban_message).await {
+        Ok(()) => {
+            ctx.send(
+                poise::CreateReply::default()
+                    .content(format!("🔨 Player `{}` has been banned from **{}**. Reason: \"{}\"", userid, instance.display_name, ban_message)),
+            )
+            .await?;
         }
         Err(e) => {
             ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
+                    .content(format!("❌ Failed to ban on **{}**: {}", instance.display_name, e))
                     .ephemeral(true),
             )
             .await?;
@@ -355,39 +258,27 @@ pub async fn unban(
     ctx.defer().await?;
 
     let data = ctx.data();
-    let url = format!("{}/v1/api/unban", data.palworld_api_url);
+    let guild_id = ctx.guild_id().map(|g| g.get());
+    let (_tenant, instance) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true)).await?;
+            return Ok(());
+        }
+    };
 
-    match data
-        .http_client
-        .post(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .header("Content-Type", "application/json")
-        .body(serde_json::json!({ "userid": userid }).to_string())
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("✅ Player `{}` has been unbanned.", userid)),
-                )
-                .await?;
-            } else {
-                let status = response.status();
-                let body = response.text().await.unwrap_or_else(|_| "<failed to read response body>".to_string());
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to unban player. Status: {}. Response: {}", status, body))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
+    match data.palworld_client.unban(&instance, &userid).await {
+        Ok(()) => {
+            ctx.send(
+                poise::CreateReply::default()
+                    .content(format!("✅ Player `{}` has been unbanned from **{}**.", userid, instance.display_name)),
+            )
+            .await?;
         }
         Err(e) => {
             ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
+                    .content(format!("❌ Failed to unban on **{}**: {}", instance.display_name, e))
                     .ephemeral(true),
             )
             .await?;
@@ -403,37 +294,27 @@ pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
 
     let data = ctx.data();
-    let url = format!("{}/v1/api/save", data.palworld_api_url);
+    let guild_id = ctx.guild_id().map(|g| g.get());
+    let (_tenant, instance) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true)).await?;
+            return Ok(());
+        }
+    };
 
-    match data
-        .http_client
-        .post(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .send()
-        .await
-    {
-        Ok(response) => {
-            if response.status().is_success() {
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content("💾 World saved successfully!"),
-                )
-                .await?;
-            } else {
-                let status = response.status();
-                let body = response.text().await.unwrap_or_else(|_| "<failed to read response body>".to_string());
-                ctx.send(
-                    poise::CreateReply::default()
-                        .content(format!("❌ Failed to save world. Status: {}. Response: {}", status, body))
-                        .ephemeral(true),
-                )
-                .await?;
-            }
+    match data.palworld_client.save(&instance).await {
+        Ok(()) => {
+            ctx.send(
+                poise::CreateReply::default()
+                    .content(format!("💾 World saved on **{}**!", instance.display_name)),
+            )
+            .await?;
         }
         Err(e) => {
             ctx.send(
                 poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
+                    .content(format!("❌ Failed to save on **{}**: {}", instance.display_name, e))
                     .ephemeral(true),
             )
             .await?;
@@ -443,49 +324,3 @@ pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-// * Values don't have to be lowercase btw, we lowercase them in the code for comparison.
-const SENSITIVE_FIELDS: &[&str] = &[
-    "adminpassword", "admin_password", "password", "passwd", "pwd",
-    "secret", "token", "key", "api", "api_key", "apikey",
-    "auth", "authorization", "credential", "cred", "rcon",
-];
-
-/// Recursively sanitize sensitive data from JSON values
-fn sanitize_sensitive_data(mut jsonKP: serde_json::Value) -> serde_json::Value {
-    match &mut jsonKP {
-        serde_json::Value::Object(map) => {
-            // List of sensitive field names to redact
-            for (key, value) in map.iter_mut() {
-                // Case-normalized key for comparison
-                let key_lc = key.to_lowercase();
-                // * Check if the key matches any sensitive field patterns
-                if SENSITIVE_FIELDS.iter().any(|&field| 
-                    
-                    key_lc == field ||
-                    
-                    key_lc.starts_with(field) || 
-                    key_lc.starts_with(&format!("{}_",&field)) ||
-                    key_lc.starts_with(&format!("{}-",field)) ||
-
-                    key_lc.ends_with(&format!("_{}",field)) ||
-                    key_lc.ends_with(&format!("-{}",field)) ||
-                    key_lc.ends_with(field)
-
-                ) {
-                    // * Stripping the value for sensitive fields
-                    *value = serde_json::Value::String("▷ REDACTED ◁".to_string());
-                } else {
-                    // * Leaving other values unchanged but sanitizing nested structures
-                    *value = sanitize_sensitive_data(std::mem::take(value));
-                }
-            }
-        }
-        serde_json::Value::Array(arr) => {
-            for item in arr.iter_mut() {
-                *item = sanitize_sensitive_data(std::mem::take(item));
-            }
-        }
-        _ => {} // Primitives don't need sanitization
-    }
-    jsonKP
-}

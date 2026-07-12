@@ -1,28 +1,68 @@
 # PalConnect Configuration Example
-# This shows how to configure the new status update feature
+# Copy this file to Config.toml and fill in your values.
 
 # Discord bot token (required)
 discord_token = "YOUR_DISCORD_BOT_TOKEN_HERE"
 
-# PalWorld server API URL (required)
-palworld_api_url = "http://your-server:8212"
+# ─── Deployment Mode ──────────────────────────────────────────────────────────
+#
+# multi_tenant = false  (default) — Self-hosted / single-guild mode.
+#   • The bot serves exactly one Discord guild.
+#   • Configuration is read from this file only; no database required.
+#   • Invites to additional guilds are automatically rejected with a helpful message.
+#
+# multi_tenant = true  — Hosted / multi-guild mode.
+#   • Each Discord guild gets its own tenant record in the database.
+#   • PalWorld server credentials are managed through the web app; never in this file.
+#   • Requires `database_url` and `credential_master_key` below.
+#
+multi_tenant = false
 
-# PalWorld admin password (required)
-palworld_admin_password = "YOUR_ADMIN_PASSWORD"
+# Whether new guild invites are accepted (multi-tenant mode only).
+# Set to false to operate a closed beta or invitation-only deployment.
+# invite_enabled = true
 
-# Enable automatic updates (optional, default: false)
-enable_autoupdate = true
+# ─── Self-Hosted Mode (multi_tenant = false) ─────────────────────────────────
+#
+# Define one or more PalWorld servers.  All fields are required per entry.
+#
+[[palworld_servers]]
+name = "Main World"
+api_url = "http://your-server:8212"
+admin_password = "YOUR_ADMIN_PASSWORD"
 
-# Port for health check endpoint (optional, default: 8080)
+# Add additional servers as needed:
+# [[palworld_servers]]
+# name = "Creative World"
+# api_url = "http://your-other-server:8212"
+# admin_password = "YOUR_OTHER_PASSWORD"
+
+# ─── Legacy Single-Server Fields (backward compat, deprecated) ───────────────
+# If [[palworld_servers]] is absent these fields are used as a fallback.
+# Prefer [[palworld_servers]] for all new deployments.
+#
+# palworld_api_url = "http://your-server:8212"
+# palworld_admin_password = "YOUR_ADMIN_PASSWORD"
+
+# ─── Multi-Tenant Mode (multi_tenant = true) ─────────────────────────────────
+# Uncomment and fill these when running in multi-tenant mode.
+#
+# database_url = "sqlite:palconnect.db"
+# credential_master_key = "BASE64_ENCODED_AES256_KEY"
+# web_app_base_url = "https://your-hosted-palconnect.example.com"
+
+# ─── Optional Settings ───────────────────────────────────────────────────────
+
+# Enable automatic bot self-updates (optional, default: false)
+enable_autoupdate = false
+
+# Port for the health-check HTTP endpoint (optional, default: 8080)
 heartbeat_port = 8080
 
-# Status update interval in seconds (optional, default: 30)
-# This controls how often the bot updates its activity status
-# with the current player count from your PalWorld server
+# How often (in seconds) to poll PalWorld servers and update status (default: 30)
 status_update_interval = 30
 
 [logging]
-# Logging configuration (optional)
 use_syslog = false
 use_stdout = true
 use_file = true
