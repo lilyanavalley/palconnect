@@ -70,6 +70,14 @@ pub trait TenantStore: Send + Sync {
     );
 }
 
+// ─── User-facing error message constants ─────────────────────────────────────
+
+const ERR_NOT_CONFIGURED: &str =
+    "⚠️ This server has not been configured yet. Please contact your administrator.";
+const ERR_DISABLED: &str = "⚠️ PalConnect is currently disabled for this server.";
+const ERR_NO_INSTANCE: &str =
+    "⚠️ No PalWorld server has been configured for this Discord server. Please contact your administrator.";
+
 // ─── Convenience helpers ─────────────────────────────────────────────────────
 
 /// Resolve the primary (or only) enabled `PalworldInstance` for a tenant.
@@ -95,16 +103,48 @@ pub fn resolve_tenant_and_instance(
 ) -> Result<(Tenant, PalworldInstance), String> {
     let tenant = store
         .get_tenant_for_guild(guild_id)
-        .ok_or_else(|| "⚠️ This server has not been configured yet. Please contact your administrator.".to_string())?;
+        .ok_or(ERR_NOT_CONFIGURED)?;
 
     if !tenant.enabled {
-        return Err("⚠️ PalConnect is currently disabled for this server.".to_string());
+        return Err(ERR_DISABLED.to_string());
     }
 
     let instance = resolve_primary_instance(store, tenant.id)
-        .ok_or_else(|| "⚠️ No PalWorld server has been configured for this Discord server. Please contact your administrator.".to_string())?;
+        .ok_or(ERR_NO_INSTANCE)?;
 
     Ok((tenant, instance))
+}
+
+/// Resolve the active tenant and **all** its enabled instances in a single call.
+///
+/// Unlike [`resolve_tenant_and_instance`] (which returns only the primary), this returns every
+/// enabled instance for the tenant so that callers can present a multi-instance selection UI or
+/// aggregate results across all servers.
+///
+/// Returns a descriptive `String` error suitable for surfacing directly in Discord replies.
+pub fn resolve_tenant_and_all_instances(
+    store: &dyn TenantStore,
+    guild_id: Option<u64>,
+) -> Result<(Tenant, Vec<PalworldInstance>), String> {
+    let tenant = store
+        .get_tenant_for_guild(guild_id)
+        .ok_or(ERR_NOT_CONFIGURED)?;
+
+    if !tenant.enabled {
+        return Err(ERR_DISABLED.to_string());
+    }
+
+    let instances: Vec<PalworldInstance> = store
+        .get_instances_for_tenant(tenant.id)
+        .into_iter()
+        .filter(|i| i.enabled)
+        .collect();
+
+    if instances.is_empty() {
+        return Err(ERR_NO_INSTANCE.to_string());
+    }
+
+    Ok((tenant, instances))
 }
 
 // ─── InMemoryTenantStore ─────────────────────────────────────────────────────
