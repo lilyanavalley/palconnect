@@ -14,25 +14,11 @@
 // <https://www.gnu.org/licenses/>.
 // 
 
-pub mod instance_selector;
+pub mod tenant_store;
+pub use tenant_store::*;
 
-pub mod about;
-pub use about::*;
+pub mod palworld_client;
+pub use palworld_client::*;
 
-pub mod help;
-pub use help::*;
-
-pub mod players;
-pub use players::*;
-
-pub mod server_info;
-pub use server_info::*;
-
-pub mod start_stop;
-pub use start_stop::*;
-
-pub mod admin_commands;
-pub use admin_commands::*;
-
-pub mod test_status;
-pub use test_status::*;
+pub mod authz_guard;
+pub use authz_guard::*;

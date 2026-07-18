@@ -16,43 +16,17 @@
 
 use log::{debug, error, info, warn};
 use poise::serenity_prelude as serenity;
-use reqwest::Client;
-use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::interval;
 use tokio::task::JoinHandle;
+use tokio::time::interval;
 use tokio_util::sync::CancellationToken;
 
+use crate::services::TenantStore;
+use crate::models::PalworldInstance;
 use crate::{BotData, Error};
 
-#[derive(Debug, Deserialize)]
-struct PlayersResponse {
-    
-    #[serde(rename = "currentplayernum")]
-    current_player_num: usize,
-
-    // * Unused fields for future use or reference
-    #[serde(rename = "maxplayernum")]
-    _max_player_num: usize,
-    #[serde(rename = "serverframetime")]
-    _server_frame_time: f32,
-    #[serde(rename = "serverfps")]
-    _server_fps: usize,
-    #[serde(rename = "uptime")]
-    _uptime: usize,
-    #[serde(rename = "days")]
-    _days: usize
-
-}
-
-#[derive(Debug, Deserialize)]
-struct ServerInfo {
-    servername: String,
-}
-
-/// Start the background task that updates the bot's status with server information
-/// Returns a JoinHandle that can be used to wait for task completion
+/// Start the background task that polls PalWorld servers and updates bot status.
 pub async fn start_status_updater(
     ctx: Arc<serenity::Context>,
     bot_data: Arc<BotData>,
@@ -60,12 +34,12 @@ pub async fn start_status_updater(
     cancellation_token: CancellationToken,
 ) -> JoinHandle<()> {
     info!("🔄 Starting status updater with {}s interval", update_interval_seconds);
-    
+
     let mut interval_timer = interval(Duration::from_secs(update_interval_seconds));
-    
-    // Set initial status
+
+    // Set initial placeholder status while the first poll runs.
     ctx.set_activity(Some(serenity::ActivityData::playing("/help - PalConnect Commands")));
-    
+
     tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -84,84 +58,144 @@ pub async fn start_status_updater(
     })
 }
 
-/// Update the bot's status with current server information
+/// Poll all tenant instances and update the global Discord presence.
+///
+/// Global presence is set to aggregate player counts across all tracked instances.
+/// Per-guild pinned status messages are also updated for any tenant that has configured a status
+/// channel (Phase 3 feature; placeholder logic runs here so the infrastructure is in place).
 async fn update_bot_status(
     ctx: &serenity::Context,
     bot_data: &BotData,
 ) -> Result<(), Error> {
-    // First try to get player count
-    match get_player_count(&bot_data.http_client, &bot_data.palworld_api_url, &bot_data.admin_password).await {
-        Ok(player_count) => {
-            // Try to get server info for max players (if available)
-            match get_server_info(&bot_data.http_client, &bot_data.palworld_api_url, &bot_data.admin_password).await {
-                Ok(server_info) => {
-                    // Show player count with server name
-                    let status = format!("{} playing | /help", player_count);
-                    ctx.set_activity(Some(serenity::ActivityData::watching(status)));
-                    debug!("Status updated: {} players on {}", player_count, server_info.servername);
+    let store = &*bot_data.tenant_store;
+    let client = &*bot_data.palworld_client;
+
+    let tenants = store.get_all_tenants();
+    if tenants.is_empty() {
+        ctx.set_activity(Some(serenity::ActivityData::playing("No servers configured | /help")));
+        return Ok(());
+    }
+
+    let mut total_players: usize = 0;
+    let mut total_max: usize = 0;
+    let mut any_online = false;
+    let mut instance_summaries: Vec<(String, bool, usize, usize)> = Vec::new(); // (name, online, current, max)
+
+    for tenant in &tenants {
+        if !tenant.enabled {
+            continue;
+        }
+        let instances = store.get_instances_for_tenant(tenant.id);
+        let enabled: Vec<&PalworldInstance> = instances.iter().filter(|i| i.enabled).collect();
+
+        for instance in &enabled {
+            match client.get_metrics(instance).await {
+                Ok(metrics) => {
+                    total_players += metrics.current_player_num;
+                    total_max += metrics.max_player_num;
+                    any_online = true;
+                    instance_summaries.push((
+                        instance.display_name.clone(),
+                        true,
+                        metrics.current_player_num,
+                        metrics.max_player_num,
+                    ));
+                    debug!(
+                        "📊 {} — {}/{} players",
+                        instance.display_name, metrics.current_player_num, metrics.max_player_num
+                    );
                 }
-                Err(_) => {
-                    // Fallback to just player count
-                    let player_word = if player_count == 1 { "player" } else { "players" };
-                    let status = format!("{} {} online | /help", player_count, player_word);
-                    ctx.set_activity(Some(serenity::ActivityData::watching(status)));
-                    debug!("Status updated: {} {} (server info unavailable)", player_count, player_word);
+                Err(e) => {
+                    warn!("⚠️ Could not reach {} — {}", instance.display_name, e);
+                    instance_summaries.push((instance.display_name.clone(), false, 0, 0));
                 }
             }
         }
-        Err(e) => {
-            // Server unreachable, show offline status
-            warn!("Server unreachable: {}", e);
-            ctx.set_activity(Some(serenity::ActivityData::playing("Server offline | /help")));
+
+        // Update per-guild pinned status message if the tenant has one configured.
+        if tenant.status_channel_id.is_some() {
+            update_tenant_status_message(ctx, bot_data, tenant, &enabled).await;
         }
     }
-    
+
+    // Update global Discord presence with aggregated stats.
+    let presence = if any_online {
+        let player_word = if total_players == 1 { "player" } else { "players" };
+        format!("{}/{} {} online | /help", total_players, total_max, player_word)
+    } else {
+        "All servers offline | /help".to_string()
+    };
+    ctx.set_activity(Some(serenity::ActivityData::watching(presence)));
+
     Ok(())
 }
 
-/// Get current player count from the PalWorld server
-async fn get_player_count(
-    http_client: &Client,
-    palworld_api_url: &str,
-    admin_password: &str,
-) -> Result<usize, Error> {
-    let url = format!("{}/v1/api/metrics", palworld_api_url);
+/// Update (or create) the pinned per-guild status message for a tenant.
+///
+/// Phase 3 implementation: if `status_channel_id` and `status_message_id` are both set, edit the
+/// existing message; otherwise post a new one and store its ID.
+async fn update_tenant_status_message(
+    ctx: &serenity::Context,
+    bot_data: &BotData,
+    tenant: &crate::models::Tenant,
+    instances: &[&PalworldInstance],
+) {
+    let Some(channel_id) = tenant.status_channel_id else {
+        return;
+    };
+    let channel = serenity::ChannelId::new(channel_id);
+    let client = &*bot_data.palworld_client;
+    let store = &*bot_data.tenant_store;
 
-    let response = http_client
-        .get(&url)
-        .basic_auth("admin", Some(admin_password))
-        .timeout(Duration::from_secs(10)) // 10 second timeout
-        .send()
-        .await?;
+    // Build the status text.
+    let mut lines: Vec<String> = Vec::new();
+    for instance in instances {
+        let line = match client.get_metrics(instance).await {
+            Ok(m) => format!(
+                "🖥️  **{}**   ✅ Online — {}/{} players",
+                instance.display_name, m.current_player_num, m.max_player_num
+            ),
+            Err(_) => format!("🖥️  **{}**   ❌ Offline / unreachable", instance.display_name),
+        };
+        lines.push(line);
+    }
+    let now = chrono::Utc::now().format("%H:%M:%S UTC");
+    lines.push(format!("🔄 *Last updated: {}*", now));
+    let content = lines.join("\n");
 
-    let count: PlayersResponse = response.json().await?;
-
-    Ok(count.current_player_num)
+    if let Some(message_id) = tenant.status_message_id {
+        // Edit existing pinned message.
+        let msg_id = serenity::MessageId::new(message_id);
+        let edit = serenity::EditMessage::new().content(&content);
+        if let Err(e) = channel.edit_message(&ctx.http, msg_id, edit).await {
+            warn!("⚠️ Could not edit status message for tenant {}: {}", tenant.id, e);
+        }
+    } else {
+        // Post a new message and pin it.
+        match channel.say(&ctx.http, &content).await {
+            Ok(msg) => {
+                if let Err(e) = channel.pin(&ctx.http, msg.id).await {
+                    warn!("⚠️ Could not pin status message: {}", e);
+                }
+                store.set_tenant_status_channel(
+                    tenant.id,
+                    Some(channel_id),
+                    Some(msg.id.get()),
+                );
+                info!("📌 Posted and pinned status message for tenant {}", tenant.id);
+            }
+            Err(e) => {
+                warn!("⚠️ Could not post status message for tenant {}: {}", tenant.id, e);
+            }
+        }
+    }
 }
 
-/// Get server information from the PalWorld server
-async fn get_server_info(
-    http_client: &Client,
-    palworld_api_url: &str,
-    admin_password: &str,
-) -> Result<ServerInfo, Error> {
-    let url = format!("{}/v1/api/info", palworld_api_url);
-    
-    let response = http_client
-        .get(&url)
-        .basic_auth("admin", Some(admin_password))
-        .timeout(Duration::from_secs(10)) // 10 second timeout
-        .send()
-        .await?;
-    
-    let server_info: ServerInfo = response.json().await?;
-    Ok(server_info)
-}
-
-/// Manually trigger a status update (useful for testing or immediate updates)
+/// Manually trigger a status update (useful for the `/update_status` test command).
 pub async fn update_status_now(
     ctx: &serenity::Context,
     bot_data: &BotData,
 ) -> Result<(), Error> {
     update_bot_status(ctx, bot_data).await
 }
+

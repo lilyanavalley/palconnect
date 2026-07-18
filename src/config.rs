@@ -19,7 +19,7 @@ use std::io::Read;
 use std::env;
 use toml;
 use serde::Deserialize;
-use log::{ trace, debug, info, warn, error };
+use log::{ trace, debug, error };
 
 
 const CONFIG_LOCATIONS: [&str; 3] = [
@@ -28,25 +28,102 @@ const CONFIG_LOCATIONS: [&str; 3] = [
     "/usr/local/etc/palconnect/Config.toml",
 ];
 
+/// Default PalWorld REST API URL used when no explicit URL is configured.
+const DEFAULT_PALWORLD_API_URL: &str = "http://localhost:8212";
+
+// ─── PalWorld server entry ────────────────────────────────────────────────────
+
+/// A single PalWorld dedicated-server definition.
+///
+/// In the config file these are expressed as `[[palworld_servers]]` table-array entries.
+/// The legacy top-level `palworld_api_url` / `palworld_admin_password` fields are converted into a
+/// single entry of this type for backward compatibility.
+#[derive(Debug, Deserialize, Clone)]
+pub struct PalworldServerConfig {
+    /// Human-readable label shown in Discord UX (e.g. "Main World").
+    pub name: String,
+    /// Base URL of the PalWorld REST API, e.g. `http://10.0.0.1:8212`.
+    pub api_url: String,
+    /// Admin password for HTTP Basic Auth.  Never logged or returned to chat.
+    pub admin_password: String,
+}
+
+// ─── Top-level Config ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub discord_token:              String,             // * Required
-    pub palworld_api_url:           String,             // * Required
-    pub palworld_admin_password:    String,             // * Required
-    pub enable_autoupdate:          Option<bool>,
-    pub heartbeat_port:             Option<u16>,
-    pub status_update_interval:     Option<u64>,        // * Status update interval in seconds
-    pub logging:                    Option<Logging>,
+    // ── Required ──────────────────────────────────────────────────────────────
+    pub discord_token: String,
+
+    // ── Deployment mode ───────────────────────────────────────────────────────
+    /// When `true`, the bot operates in multi-tenant mode: tenant and server configuration is
+    /// managed through the hosted web app and a database.  When `false` (the default), the bot
+    /// runs in single-tenant (self-hosted) mode and reads server credentials from this file.
+    pub multi_tenant: Option<bool>,
+
+    /// Whether the bot accepts new guild invites (operator-level gate).
+    ///
+    /// Defaults to `false` in single-tenant mode (only the first guild join is accepted) and
+    /// `true` in multi-tenant mode.  Set explicitly in config to override.
+    pub invite_enabled: Option<bool>,
+
+    // ── Multi-server array (preferred) ────────────────────────────────────────
+    /// One or more PalWorld server definitions.  Use `[[palworld_servers]]` table-array syntax in
+    /// `Config.toml`.  The first entry is treated as the primary server.
+    pub palworld_servers: Option<Vec<PalworldServerConfig>>,
+
+    // ── Legacy single-server fields (backward compatible) ─────────────────────
+    /// Deprecated in favour of `[[palworld_servers]]`.  Still supported so that existing configs
+    /// continue to work without modification.
+    pub palworld_api_url: Option<String>,
+    /// Deprecated in favour of `[[palworld_servers]]`.  Still supported for backward compatibility.
+    pub palworld_admin_password: Option<String>,
+
+    // ── Optional bot settings ─────────────────────────────────────────────────
+    pub enable_autoupdate:      Option<bool>,
+    pub heartbeat_port:         Option<u16>,
+    /// How often (in seconds) the bot polls PalWorld servers and updates status.  Min 15.
+    pub status_update_interval: Option<u64>,
+    pub logging:                Option<Logging>,
 }
 
 impl Config {
     pub fn autoupdate(&self) -> bool {
         self.enable_autoupdate.unwrap_or(false)
     }
-    
+
     pub fn status_update_interval(&self) -> u64 {
-        self.status_update_interval.unwrap_or(30) // Default to 30 seconds
+        self.status_update_interval.unwrap_or(30)
+    }
+
+    pub fn multi_tenant(&self) -> bool {
+        self.multi_tenant.unwrap_or(false)
+    }
+
+    pub fn invite_allowed(&self) -> bool {
+        self.invite_enabled
+            .unwrap_or_else(|| self.multi_tenant()) // default: allowed iff multi-tenant
+    }
+
+    /// Return the effective list of PalWorld server definitions.
+    ///
+    /// Prefers the `[[palworld_servers]]` array; falls back to the legacy `palworld_api_url` /
+    /// `palworld_admin_password` fields so that existing configurations continue to work without
+    /// any migration.
+    pub fn effective_palworld_servers(&self) -> Vec<PalworldServerConfig> {
+        if let Some(servers) = &self.palworld_servers {
+            if !servers.is_empty() {
+                return servers.clone();
+            }
+        }
+        // Legacy fallback
+        let url = self.palworld_api_url.clone().unwrap_or_else(|| DEFAULT_PALWORLD_API_URL.to_string());
+        let password = self.palworld_admin_password.clone().unwrap_or_default();
+        vec![PalworldServerConfig {
+            name: "PalWorld Server".to_string(),
+            api_url: url,
+            admin_password: password,
+        }]
     }
 }
 
@@ -54,8 +131,11 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             discord_token:              String::new(),
-            palworld_api_url:           String::from("http://localhost:8212/"),
-            palworld_admin_password:    String::new(),
+            multi_tenant:               None,
+            invite_enabled:             None,
+            palworld_servers:           None,
+            palworld_api_url:           Some(String::from("http://localhost:8212/")),
+            palworld_admin_password:    Some(String::new()),
             enable_autoupdate:          None,
             heartbeat_port:             None,
             status_update_interval:     None,
@@ -104,12 +184,29 @@ pub fn setup() -> Config {
         config.discord_token = discord_token;
     }
 
+    // Legacy single-server env vars (still supported for backward compatibility).
+    // When PALWORLD_API_URL / PALWORLD_ADMIN_PASSWORD are set they override the legacy fields;
+    // if [[palworld_servers]] is also present in the config file, the env vars are ignored.
     if let Ok(palworld_api_url) = env::var("PALWORLD_API_URL") {
-        config.palworld_api_url = palworld_api_url;
+        config.palworld_api_url = Some(palworld_api_url);
     }
     
     if let Ok(admin_password) = env::var("PALWORLD_ADMIN_PASSWORD") {
-        config.palworld_admin_password = admin_password;
+        config.palworld_admin_password = Some(admin_password);
+    }
+
+    if let Ok(val) = env::var("MULTI_TENANT") {
+        config.multi_tenant = Some(
+            val.to_lowercase().parse::<bool>()
+                .expect("Failed to parse MULTI_TENANT as bool. Expected 'true' or 'false'"),
+        );
+    }
+
+    if let Ok(val) = env::var("INVITE_ENABLED") {
+        config.invite_enabled = Some(
+            val.to_lowercase().parse::<bool>()
+                .expect("Failed to parse INVITE_ENABLED as bool. Expected 'true' or 'false'"),
+        );
     }
     
     if let Ok(heartbeat_port) = env::var("HEARTBEAT_PORT") {

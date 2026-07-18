@@ -15,65 +15,102 @@
 // 
 
 use poise::serenity_prelude as serenity;
-use serde::Deserialize;
 
+use crate::commands::instance_selector::find_instance_by_name;
+use crate::services::resolve_tenant_and_all_instances;
 use crate::{Context, Error};
 
 
-// PalWorld API response structures
-#[derive(Debug, Deserialize)]
-struct ServerInfo {
-    version: String,
-    servername: String,
-    description: String,
-}
-
-/// Show server information
+/// Show server information.
+///
+/// With a single configured server the output matches the pre-Phase-2 behaviour.
+/// With multiple servers information for each instance is shown unless `server` is specified.
 #[poise::command(slash_command)]
-pub async fn serverinfo(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn serverinfo(
+    ctx: Context<'_>,
+    #[description = "Server name to query (default: all servers)"] server: Option<String>,
+) -> Result<(), Error> {
     ctx.defer().await?;
 
     let data = ctx.data();
-    let url = format!("{}/v1/api/info", data.palworld_api_url);
+    let guild_id = ctx.guild_id().map(|g| g.get());
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true)).await?;
+            return Ok(());
+        }
+    };
 
-    match data
-        .http_client
-        .get(&url)
-        .basic_auth("admin", Some(&data.admin_password))
-        .send()
-        .await
-    {
-        Ok(response) => match response.json::<ServerInfo>().await {
-            Ok(server_info) => {
+    if instances.len() == 1 || server.is_some() {
+        // Single target
+        let instance = if let Some(ref name) = server {
+            match find_instance_by_name(&instances, name) {
+                Some(i) => i,
+                None => {
+                    ctx.send(poise::CreateReply::default()
+                        .content(format!("❌ No server named **{}** found.", name))
+                        .ephemeral(true))
+                        .await?;
+                    return Ok(());
+                }
+            }
+        } else {
+            &instances[0]
+        };
+
+        match data.palworld_client.get_server_info(instance).await {
+            Ok(info) => {
                 let embed = serenity::CreateEmbed::new()
-                    // TODO: Allow custom server info by selections
                     .title("🏰 Server Information")
-                    .field("Server Name", &server_info.servername, true)
-                    .field("Version", &server_info.version, true)
-                    .field("Description", &server_info.description, false)
-                    .color(0x0099ff) // TODO: Allow custom color
+                    .field("Server Name", &info.servername, true)
+                    .field("Version", &info.version, true)
+                    .field("Description", &info.description, false)
+                    .color(0x0099ff)
                     .timestamp(serenity::Timestamp::now());
-
                 ctx.send(poise::CreateReply::default().embed(embed)).await?;
             }
             Err(e) => {
                 ctx.send(
                     poise::CreateReply::default()
-                        .content(format!("❌ Failed to parse server response: {}", e))
+                        .content(format!("❌ Failed to reach **{}**: {}", instance.display_name, e))
                         .ephemeral(true),
                 )
                 .await?;
             }
-        },
-        Err(e) => {
-            ctx.send(
-                poise::CreateReply::default()
-                    .content(format!("❌ Failed to connect to PalWorld server: {}", e))
-                    .ephemeral(true),
-            )
-            .await?;
         }
+    } else {
+        // Multiple servers: one embed section per instance.
+        let mut embed = serenity::CreateEmbed::new()
+            .title("🏰 Server Information — All Servers")
+            .color(0x0099ff)
+            .timestamp(serenity::Timestamp::now());
+
+        for instance in &instances {
+            match data.palworld_client.get_server_info(instance).await {
+                Ok(info) => {
+                    embed = embed.field(
+                        format!("🖥️ {}", instance.display_name),
+                        format!(
+                            "**Name:** {}\n**Version:** {}\n**Description:** {}",
+                            info.servername, info.version, info.description
+                        ),
+                        false,
+                    );
+                }
+                Err(e) => {
+                    embed = embed.field(
+                        format!("🖥️ {} — ❌ unreachable", instance.display_name),
+                        format!("{}", e),
+                        false,
+                    );
+                }
+            }
+        }
+
+        ctx.send(poise::CreateReply::default().embed(embed)).await?;
     }
 
     Ok(())
 }
+
