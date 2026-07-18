@@ -11,7 +11,7 @@ use palconnect_bridge::{
 };
 
 use crate::models::PalworldInstance;
-use crate::services::{InMemoryTenantStore, PalworldClient, TenantStore};
+use crate::services::{InMemoryTenantStore, PalworldClient, TenantStore, DEFAULT_NEW_TENANT_NAME};
 
 #[derive(Clone)]
 pub struct BridgeApiState {
@@ -53,8 +53,11 @@ pub async fn get_guild_admin_state(
     }
 
     let guild_id = path.into_inner();
-    let guild_name = format!("Guild {}", guild_id);
-    HttpResponse::Ok().json(state.tenant_store.ensure_admin_state_for_guild(guild_id, &guild_name))
+    HttpResponse::Ok().json(
+        state
+            .tenant_store
+            .ensure_admin_state_for_guild(guild_id, DEFAULT_NEW_TENANT_NAME),
+    )
 }
 
 #[put("/api/v1/admin/guilds/{guild_id}")]

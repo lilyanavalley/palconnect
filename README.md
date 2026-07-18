@@ -114,6 +114,9 @@ PALCONNECT_BOT_BRIDGE_URL=http://127.0.0.1:8080 \
 cargo run -p palconnect-web
 ```
 
+For non-local deployments, set `PALCONNECT_BOT_BRIDGE_URL` to an `https://` origin so the bridge
+token is not sent over plaintext HTTP.
+
 The admin console uses Leptos server functions to call the bot bridge API, which currently exposes:
 
 - `GET /api/v1/admin/guilds/{guild_id}` — load editable tenant state

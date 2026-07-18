@@ -91,7 +91,7 @@ const ERR_NOT_CONFIGURED: &str =
 const ERR_DISABLED: &str = "⚠️ PalConnect is currently disabled for this server.";
 const ERR_NO_INSTANCE: &str =
     "⚠️ No PalWorld server has been configured for this Discord server. Please contact your administrator.";
-const DEFAULT_NEW_TENANT_NAME: &str = "Unnamed Guild";
+pub const DEFAULT_NEW_TENANT_NAME: &str = "Unnamed Guild";
 
 // ─── Convenience helpers ─────────────────────────────────────────────────────
 
@@ -234,7 +234,9 @@ impl InMemoryTenantStore {
     fn next_id(counter: &RwLock<u64>) -> u64 {
         let mut guard = counter.write().unwrap();
         let next = *guard;
-        *guard += 1;
+        *guard = guard
+            .checked_add(1)
+            .expect("tenant store ID counter overflowed");
         next
     }
 

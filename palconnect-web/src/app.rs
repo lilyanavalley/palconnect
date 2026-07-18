@@ -46,14 +46,14 @@ pub fn App() -> impl IntoView {
         <Title text="PalConnect Admin Console" />
         <Router>
             <FlatRoutes fallback=|| "Page not found.">
-                <Route path=StaticSegment("") view=HomePage />
+                <Route path=StaticSegment("") view=AdminConsolePage />
             </FlatRoutes>
         </Router>
     }
 }
 
 #[component]
-fn HomePage() -> impl IntoView {
+fn AdminConsolePage() -> impl IntoView {
     let guild_id_ref = NodeRef::<Input>::new();
     let tenant_name_ref = NodeRef::<Input>::new();
     let instances_ref = NodeRef::<Textarea>::new();
@@ -368,6 +368,14 @@ where
         return Err(ServerFnError::new(
             "PALCONNECT_BOT_BRIDGE_URL must use http or https",
         ));
+    }
+    if parsed_base_url.scheme() == "http" {
+        let host = parsed_base_url.host_str().unwrap_or_default();
+        if !matches!(host, "127.0.0.1" | "localhost") {
+            return Err(ServerFnError::new(
+                "PALCONNECT_BOT_BRIDGE_URL must use https unless it targets localhost",
+            ));
+        }
     }
     let token = std::env::var("BRIDGE_API_TOKEN")
         .map_err(|_| ServerFnError::new("BRIDGE_API_TOKEN must be set for palconnect-web"))?;
