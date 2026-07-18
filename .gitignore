@@ -2,8 +2,9 @@
 /target/
 Cargo.lock
 
-# Environment variables
+# Environment variables + configuration files
 .env
+Config.toml
 
 # IDE
 .vscode/
