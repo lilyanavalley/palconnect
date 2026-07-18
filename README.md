@@ -88,6 +88,38 @@ AdminPassword=your_secure_admin_password_here
 
 The bot will automatically register slash commands when it starts up.
 
+### 6. Phase 4 Multi-Tenant Admin Workspace
+
+PalConnect now ships as a Cargo workspace with:
+
+- `palconnect` — the Discord bot and bot-side bridge API
+- `palconnect-bridge` — shared request/response models for bot ↔ web communication
+- `palconnect-web` — the Leptos admin console for guild configuration
+
+When running the hosted multi-tenant flow, configure the bot with a shared bridge token:
+
+```env
+BRIDGE_API_TOKEN=replace_me_with_a_shared_secret
+```
+
+Then start the two processes separately:
+
+```bash
+# Discord bot + bridge API on http://127.0.0.1:8080
+cargo run -p palconnect
+
+# Leptos admin console on http://127.0.0.1:3000
+BRIDGE_API_TOKEN=replace_me_with_a_shared_secret \
+PALCONNECT_BOT_BRIDGE_URL=http://127.0.0.1:8080 \
+cargo run -p palconnect-web
+```
+
+The admin console uses Leptos server functions to call the bot bridge API, which currently exposes:
+
+- `GET /api/v1/admin/guilds/{guild_id}` — load editable tenant state
+- `PUT /api/v1/admin/guilds/{guild_id}` — save tenant, server, and role policy changes
+- `POST /api/v1/admin/test-connection` — test a PalWorld server connection through the bot
+
 ## Development
 
 ### Project Structure

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use actix_web::{
     get, post, put,
-    web::{self, Data, Json, Path},
+    web::{Data, Json, Path},
     HttpRequest, HttpResponse, Responder,
 };
 use log::warn;

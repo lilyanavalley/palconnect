@@ -59,6 +59,10 @@ enable_autoupdate = false
 # Port for the health-check HTTP endpoint (optional, default: 8080)
 heartbeat_port = 8080
 
+# Shared secret expected by the bot bridge API. The web app must send the same token in
+# BRIDGE_API_TOKEN so only trusted requests can mutate tenant configuration.
+# bridge_api_token = "replace_me_with_a_shared_secret"
+
 # How often (in seconds) to poll PalWorld servers and update status (default: 30)
 status_update_interval = 30
 
