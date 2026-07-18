@@ -15,6 +15,7 @@ use palconnect_bridge::{
 use serde::de::DeserializeOwned;
 
 fn apply_loaded_state(
+    set_tenant_id: WriteSignal<u64>,
     set_guild_id: WriteSignal<String>,
     set_tenant_name: WriteSignal<String>,
     set_enabled: WriteSignal<bool>,
@@ -23,6 +24,7 @@ fn apply_loaded_state(
     set_role_policies_json: WriteSignal<String>,
     state: TenantAdminState,
 ) {
+    set_tenant_id.set(state.tenant_id);
     set_guild_id.set(state.guild_id.to_string());
     set_tenant_name.set(state.tenant_name);
     set_enabled.set(state.enabled);
@@ -59,6 +61,7 @@ fn HomePage() -> impl IntoView {
     let test_url_ref = NodeRef::<Input>::new();
     let test_password_ref = NodeRef::<Input>::new();
 
+    let (tenant_id, set_tenant_id) = signal(0_u64);
     let (guild_id, set_guild_id) = signal(String::new());
     let (tenant_name, set_tenant_name) = signal(String::new());
     let (enabled, set_enabled) = signal(true);
@@ -103,6 +106,7 @@ fn HomePage() -> impl IntoView {
                             match load_guild_state(parsed_guild_id).await {
                                 Ok(state) => {
                                     apply_loaded_state(
+                                        set_tenant_id,
                                         set_guild_id,
                                         set_tenant_name,
                                         set_enabled,
@@ -182,6 +186,7 @@ fn HomePage() -> impl IntoView {
                             set_status.set("Load a numeric guild ID before saving.".to_string());
                             return;
                         };
+                        let tenant_id = tenant_id.get();
                         let tenant_name = tenant_name.get();
                         let enabled = enabled.get();
                         let invite_allowed = invite_allowed.get();
@@ -198,6 +203,7 @@ fn HomePage() -> impl IntoView {
                         spawn_local(async move {
                             match save_guild_state(
                                 parsed_guild_id,
+                                tenant_id,
                                 tenant_name,
                                 enabled,
                                 invite_allowed,
@@ -208,6 +214,7 @@ fn HomePage() -> impl IntoView {
                             {
                                 Ok(state) => {
                                     apply_loaded_state(
+                                        set_tenant_id,
                                         set_guild_id,
                                         set_tenant_name,
                                         set_enabled,
@@ -275,6 +282,7 @@ async fn load_guild_state(guild_id: u64) -> Result<TenantAdminState, ServerFnErr
 #[server]
 async fn save_guild_state(
     guild_id: u64,
+    tenant_id: u64,
     tenant_name: String,
     enabled: bool,
     invite_allowed: bool,
@@ -290,7 +298,7 @@ async fn save_guild_state(
         &format!("/api/v1/admin/guilds/{guild_id}"),
         &TenantAdminState {
             guild_id,
-            tenant_id: 0,
+            tenant_id,
             tenant_name,
             enabled,
             invite_allowed,
@@ -354,12 +362,24 @@ where
 {
     let base_url = std::env::var("PALCONNECT_BOT_BRIDGE_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
+    let parsed_base_url = reqwest::Url::parse(&base_url)
+        .map_err(|err| ServerFnError::new(format!("invalid PALCONNECT_BOT_BRIDGE_URL: {err}")))?;
+    if !matches!(parsed_base_url.scheme(), "http" | "https") {
+        return Err(ServerFnError::new(
+            "PALCONNECT_BOT_BRIDGE_URL must use http or https",
+        ));
+    }
     let token = std::env::var("BRIDGE_API_TOKEN")
         .map_err(|_| ServerFnError::new("BRIDGE_API_TOKEN must be set for palconnect-web"))?;
 
     let client = reqwest::Client::new();
     let mut request = client
-        .request(method, format!("{}{}", base_url.trim_end_matches('/'), path))
+        .request(
+            method,
+            parsed_base_url
+                .join(path.trim_start_matches('/'))
+                .map_err(|err| ServerFnError::new(format!("invalid bridge path: {err}")))?,
+        )
         .header("x-palconnect-bridge-token", token);
 
     if let Some(body) = body {

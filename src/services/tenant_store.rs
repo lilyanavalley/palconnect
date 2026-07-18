@@ -91,6 +91,7 @@ const ERR_NOT_CONFIGURED: &str =
 const ERR_DISABLED: &str = "⚠️ PalConnect is currently disabled for this server.";
 const ERR_NO_INSTANCE: &str =
     "⚠️ No PalWorld server has been configured for this Discord server. Please contact your administrator.";
+const DEFAULT_NEW_TENANT_NAME: &str = "Unnamed Guild";
 
 // ─── Convenience helpers ─────────────────────────────────────────────────────
 
@@ -303,6 +304,23 @@ impl InMemoryTenantStore {
         self.tenants.write().unwrap().push(tenant.clone());
         tenant
     }
+
+    fn validate_role_policy_instance_ids(
+        role_policies: &[palconnect_bridge::RolePolicyConfig],
+        known_instance_ids: &[u64],
+    ) -> Result<(), String> {
+        for policy in role_policies {
+            if let Some(instance_id) = policy.palworld_instance_id {
+                if !known_instance_ids.contains(&instance_id) {
+                    return Err(format!(
+                        "role policy references unknown PalWorld instance ID {}",
+                        instance_id
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl TenantStore for InMemoryTenantStore {
@@ -427,7 +445,7 @@ impl TenantStore for InMemoryTenantStore {
             self.ensure_multi_tenant(
                 guild_id,
                 if state.tenant_name.trim().is_empty() {
-                    "Unnamed Guild"
+                    DEFAULT_NEW_TENANT_NAME
                 } else {
                     &state.tenant_name
                 },
@@ -468,21 +486,6 @@ impl TenantStore for InMemoryTenantStore {
             }
         }
 
-        let instance_ids: Vec<u64> = normalized_instances
-            .iter()
-            .map(|instance| instance.id.unwrap_or_default())
-            .collect();
-        for policy in &state.role_policies {
-            if let Some(instance_id) = policy.palworld_instance_id {
-                if instance_id != 0 && !instance_ids.contains(&instance_id) {
-                    return Err(format!(
-                        "role policy references unknown PalWorld instance ID {}",
-                        instance_id
-                    ));
-                }
-            }
-        }
-
         let instances: Vec<PalworldInstance> = normalized_instances
             .into_iter()
             .map(|instance| PalworldInstance {
@@ -499,18 +502,11 @@ impl TenantStore for InMemoryTenantStore {
             .collect();
 
         let known_instance_ids: Vec<u64> = instances.iter().map(|instance| instance.id).collect();
+        Self::validate_role_policy_instance_ids(&state.role_policies, &known_instance_ids)?;
         let role_policies: Vec<RolePolicy> = state
             .role_policies
             .into_iter()
             .map(|policy| {
-                if let Some(instance_id) = policy.palworld_instance_id {
-                    if !known_instance_ids.contains(&instance_id) {
-                        return Err(format!(
-                            "role policy references unknown PalWorld instance ID {}",
-                            instance_id
-                        ));
-                    }
-                }
                 Ok(RolePolicy {
                     id: policy
                         .id
