@@ -82,6 +82,7 @@ pub struct Config {
     // ── Optional bot settings ─────────────────────────────────────────────────
     pub enable_autoupdate:      Option<bool>,
     pub heartbeat_port:         Option<u16>,
+    pub bridge_api_token:       Option<String>,
     /// How often (in seconds) the bot polls PalWorld servers and updates status.  Min 15.
     pub status_update_interval: Option<u64>,
     pub logging:                Option<Logging>,
@@ -103,6 +104,12 @@ impl Config {
     pub fn invite_allowed(&self) -> bool {
         self.invite_enabled
             .unwrap_or_else(|| self.multi_tenant()) // default: allowed iff multi-tenant
+    }
+
+    pub fn bridge_api_token(&self) -> Option<&str> {
+        self.bridge_api_token
+            .as_deref()
+            .filter(|token| !token.trim().is_empty())
     }
 
     /// Return the effective list of PalWorld server definitions.
@@ -138,6 +145,7 @@ impl Default for Config {
             palworld_admin_password:    Some(String::new()),
             enable_autoupdate:          None,
             heartbeat_port:             None,
+            bridge_api_token:           None,
             status_update_interval:     None,
             logging:                    None,
         }
@@ -214,6 +222,10 @@ pub fn setup() -> Config {
             heartbeat_port.parse::<u16>()
                 .expect("Failed to parse HEARTBEAT_PORT as u16")
         );
+    }
+
+    if let Ok(bridge_api_token) = env::var("BRIDGE_API_TOKEN") {
+        config.bridge_api_token = Some(bridge_api_token);
     }
 
     // Check for autoupdate and status interval env vars

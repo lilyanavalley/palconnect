@@ -1,0 +1,38 @@
+[package]
+name = "palconnect-web"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = ["ssr"]
+ssr = []
+hydrate = []
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+actix-web.workspace = true
+leptos.workspace = true
+leptos_actix.workspace = true
+leptos_meta.workspace = true
+leptos_router.workspace = true
+palconnect-bridge = { path = "../palconnect-bridge" }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[package.metadata.leptos]
+site-root = "target/site"
+site-pkg-dir = "pkg"
+site-addr = "127.0.0.1:3000"
+reload-port = 3001
+browserquery = "defaults"
+env = "DEV"
+bin-features = ["ssr"]
+lib-features = ["hydrate"]
+bin-default-features = false
+lib-default-features = false

@@ -45,7 +45,7 @@
 ///
 // TODO: include documentation on *how* to use this app.
 
-use actix_web::{App, HttpServer};
+use actix_web::{App, HttpServer, web};
 use cargo_packager_updater;
 use clap::Parser;
 use fern;
@@ -73,6 +73,8 @@ mod commands;
 use commands::*;
 mod health_check;
 use health_check::*;
+mod bridge_api;
+use bridge_api::*;
 
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -199,8 +201,9 @@ async fn dispatcher() -> Result<(), Error> {
     // Store config values we need later before moving config
     let heartbeat_port = config.heartbeat_port.unwrap_or(8080);
     let discord_token = config.discord_token.clone();
+    let bridge_api_token = config.bridge_api_token().map(str::to_owned);
 
-    start_services(config, discord_token, heartbeat_port).await
+    start_services(config, discord_token, heartbeat_port, bridge_api_token).await
 }
 
 /// Checks for available updates and installs them if autoupdate is enabled.
@@ -259,6 +262,7 @@ async fn start_services(
     config: Config,
     discord_token: String,
     heartbeat_port: u16,
+    bridge_api_token: Option<String>,
 ) -> Result<(), Error> {
     // Create cancellation token and JoinHandle storage for graceful shutdown
     let cancellation_token = CancellationToken::new();
@@ -270,6 +274,11 @@ async fn start_services(
     let tenant_store = Arc::new(InMemoryTenantStore::from_config(&config));
     let palworld_client = Arc::new(PalworldClient::new());
     let authz_guard = Arc::new(AuthzGuard::new());
+    let bridge_api_state = web::Data::new(BridgeApiState {
+        tenant_store: tenant_store.clone(),
+        palworld_client: palworld_client.clone(),
+        bridge_api_token,
+    });
 
     let status_interval = config.status_update_interval();
 
@@ -331,7 +340,14 @@ async fn start_services(
         .expect("Failed to create Discord client");
 
     // * Setup Actix Web server
-    let actix_server = HttpServer::new(|| App::new().service(health_check))
+    let actix_server = HttpServer::new(move || {
+        App::new()
+            .app_data(bridge_api_state.clone())
+            .service(health_check)
+            .service(get_guild_admin_state)
+            .service(put_guild_admin_state)
+            .service(post_test_connection)
+    })
         .bind(("0.0.0.0", heartbeat_port))?
         .run();
 
@@ -435,7 +451,8 @@ async fn on_event<'a>(
         } else {
             // Multi-tenant mode with invites enabled — welcome the new guild.
             info!("🎉 Multi-tenant: new guild joined — {} ({})", guild.name, guild.id);
-            // Phase 4 will create a Tenant record and post an onboarding embed here.
+            data.tenant_store
+                .ensure_admin_state_for_guild(guild.id.get(), &guild.name);
         }
     } else if *is_new == Some(false) {
         // Startup resume — bind the single tenant to the first guild seen if not yet bound.

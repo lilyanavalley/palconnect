@@ -18,6 +18,7 @@ use std::sync::RwLock;
 
 use crate::config::Config;
 use crate::models::{PalworldInstance, RolePolicy, Tenant};
+use palconnect_bridge::TenantAdminState;
 
 // ─── TenantStore trait ───────────────────────────────────────────────────────
 
@@ -68,6 +69,19 @@ pub trait TenantStore: Send + Sync {
         channel_id: Option<u64>,
         message_id: Option<u64>,
     );
+
+    /// Ensure a tenant exists for the guild and return its current administrative state.
+    fn ensure_admin_state_for_guild(&self, guild_id: u64, guild_name: &str) -> TenantAdminState;
+
+    /// Return the administrative state for a guild without mutating storage.
+    fn get_admin_state_for_guild(&self, guild_id: u64) -> Option<TenantAdminState>;
+
+    /// Replace the editable administrative state for a guild.
+    fn replace_admin_state_for_guild(
+        &self,
+        guild_id: u64,
+        state: TenantAdminState,
+    ) -> Result<TenantAdminState, String>;
 }
 
 // ─── User-facing error message constants ─────────────────────────────────────
@@ -161,6 +175,9 @@ pub struct InMemoryTenantStore {
     role_policies: RwLock<Vec<RolePolicy>>,
     multi_tenant: bool,
     invite_allowed: bool,
+    next_tenant_id: RwLock<u64>,
+    next_instance_id: RwLock<u64>,
+    next_role_policy_id: RwLock<u64>,
 }
 
 impl InMemoryTenantStore {
@@ -186,6 +203,7 @@ impl InMemoryTenantStore {
         // Build instances from the [[palworld_servers]] array, or fall back to the legacy single-
         // server fields for backward compatibility.
         let raw_servers = config.effective_palworld_servers();
+        let server_count = raw_servers.len() as u64;
         let instances: Vec<PalworldInstance> = raw_servers
             .into_iter()
             .enumerate()
@@ -206,15 +224,99 @@ impl InMemoryTenantStore {
             role_policies: RwLock::new(vec![]),
             multi_tenant,
             invite_allowed,
+            next_tenant_id: RwLock::new(2),
+            next_instance_id: RwLock::new(server_count + 1),
+            next_role_policy_id: RwLock::new(1),
         }
+    }
+
+    fn next_id(counter: &RwLock<u64>) -> u64 {
+        let mut guard = counter.write().unwrap();
+        let next = *guard;
+        *guard += 1;
+        next
+    }
+
+    fn build_admin_state(&self, tenant: &Tenant) -> TenantAdminState {
+        let instances = self
+            .instances
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|instance| instance.tenant_id == tenant.id)
+            .map(|instance| palconnect_bridge::PalworldInstanceConfig {
+                id: Some(instance.id),
+                display_name: instance.display_name.clone(),
+                api_url: instance.api_url.clone(),
+                admin_password: instance.admin_password.clone(),
+                enabled: instance.enabled,
+                is_primary: instance.is_primary,
+            })
+            .collect();
+
+        let role_policies = self
+            .role_policies
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|policy| policy.tenant_id == tenant.id)
+            .map(|policy| palconnect_bridge::RolePolicyConfig {
+                id: Some(policy.id),
+                palworld_instance_id: policy.palworld_instance_id,
+                discord_role_id: policy.discord_role_id,
+                allowed_commands: policy.allowed_commands.clone(),
+            })
+            .collect();
+
+        TenantAdminState {
+            guild_id: tenant.discord_guild_id.unwrap_or_default(),
+            tenant_id: tenant.id,
+            tenant_name: tenant.name.clone(),
+            enabled: tenant.enabled,
+            invite_allowed: tenant.invite_allowed,
+            instances,
+            role_policies,
+        }
+    }
+
+    fn ensure_multi_tenant(&self, guild_id: u64, guild_name: &str) -> Tenant {
+        if let Some(existing) = self
+            .tenants
+            .read()
+            .unwrap()
+            .iter()
+            .find(|tenant| tenant.discord_guild_id == Some(guild_id))
+            .cloned()
+        {
+            return existing;
+        }
+
+        let tenant = Tenant {
+            id: Self::next_id(&self.next_tenant_id),
+            discord_guild_id: Some(guild_id),
+            name: guild_name.to_string(),
+            enabled: true,
+            invite_allowed: self.invite_allowed,
+            status_channel_id: None,
+            status_message_id: None,
+        };
+        self.tenants.write().unwrap().push(tenant.clone());
+        tenant
     }
 }
 
 impl TenantStore for InMemoryTenantStore {
-    fn get_tenant_for_guild(&self, _guild_id: Option<u64>) -> Option<Tenant> {
-        // In single-tenant mode the one tenant always matches any guild.
-        // Multi-tenant DB lookup will be implemented in Phase 4.
-        self.tenants.read().unwrap().first().cloned()
+    fn get_tenant_for_guild(&self, guild_id: Option<u64>) -> Option<Tenant> {
+        let tenants = self.tenants.read().unwrap();
+        if self.multi_tenant {
+            let guild_id = guild_id?;
+            tenants
+                .iter()
+                .find(|tenant| tenant.discord_guild_id == Some(guild_id))
+                .cloned()
+        } else {
+            tenants.first().cloned()
+        }
     }
 
     fn get_instances_for_tenant(&self, tenant_id: u64) -> Vec<PalworldInstance> {
@@ -281,5 +383,171 @@ impl TenantStore for InMemoryTenantStore {
             t.status_channel_id = channel_id;
             t.status_message_id = message_id;
         }
+    }
+
+    fn ensure_admin_state_for_guild(&self, guild_id: u64, guild_name: &str) -> TenantAdminState {
+        if self.multi_tenant {
+            let tenant = self.ensure_multi_tenant(guild_id, guild_name);
+            self.build_admin_state(&tenant)
+        } else {
+            if self.get_single_tenant_guild_id().is_none() {
+                self.bind_single_tenant_guild(guild_id);
+            }
+            let tenant = self
+                .tenants
+                .read()
+                .unwrap()
+                .first()
+                .cloned()
+                .expect("single-tenant store must contain a tenant");
+            self.build_admin_state(&tenant)
+        }
+    }
+
+    fn get_admin_state_for_guild(&self, guild_id: u64) -> Option<TenantAdminState> {
+        let tenant = if self.multi_tenant {
+            self.tenants
+                .read()
+                .unwrap()
+                .iter()
+                .find(|tenant| tenant.discord_guild_id == Some(guild_id))
+                .cloned()
+        } else {
+            self.tenants.read().unwrap().first().cloned()
+        }?;
+        Some(self.build_admin_state(&tenant))
+    }
+
+    fn replace_admin_state_for_guild(
+        &self,
+        guild_id: u64,
+        state: TenantAdminState,
+    ) -> Result<TenantAdminState, String> {
+        let tenant = if self.multi_tenant {
+            self.ensure_multi_tenant(
+                guild_id,
+                if state.tenant_name.trim().is_empty() {
+                    "Unnamed Guild"
+                } else {
+                    &state.tenant_name
+                },
+            )
+        } else {
+            if self.get_single_tenant_guild_id().is_none() {
+                self.bind_single_tenant_guild(guild_id);
+            }
+            self.tenants
+                .read()
+                .unwrap()
+                .first()
+                .cloned()
+                .ok_or_else(|| "single-tenant store is missing its default tenant".to_string())?
+        };
+
+        let mut normalized_instances = state.instances;
+        if !normalized_instances.is_empty() {
+            let primary_count = normalized_instances
+                .iter()
+                .filter(|instance| instance.is_primary)
+                .count();
+            if primary_count == 0 {
+                if let Some(first) = normalized_instances.first_mut() {
+                    first.is_primary = true;
+                }
+            } else if primary_count > 1 {
+                let mut seen_primary = false;
+                for instance in &mut normalized_instances {
+                    if instance.is_primary {
+                        if seen_primary {
+                            instance.is_primary = false;
+                        } else {
+                            seen_primary = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        let instance_ids: Vec<u64> = normalized_instances
+            .iter()
+            .map(|instance| instance.id.unwrap_or_default())
+            .collect();
+        for policy in &state.role_policies {
+            if let Some(instance_id) = policy.palworld_instance_id {
+                if instance_id != 0 && !instance_ids.contains(&instance_id) {
+                    return Err(format!(
+                        "role policy references unknown PalWorld instance ID {}",
+                        instance_id
+                    ));
+                }
+            }
+        }
+
+        let instances: Vec<PalworldInstance> = normalized_instances
+            .into_iter()
+            .map(|instance| PalworldInstance {
+                id: instance
+                    .id
+                    .unwrap_or_else(|| Self::next_id(&self.next_instance_id)),
+                tenant_id: tenant.id,
+                display_name: instance.display_name,
+                api_url: instance.api_url,
+                admin_password: instance.admin_password,
+                enabled: instance.enabled,
+                is_primary: instance.is_primary,
+            })
+            .collect();
+
+        let known_instance_ids: Vec<u64> = instances.iter().map(|instance| instance.id).collect();
+        let role_policies: Vec<RolePolicy> = state
+            .role_policies
+            .into_iter()
+            .map(|policy| {
+                if let Some(instance_id) = policy.palworld_instance_id {
+                    if !known_instance_ids.contains(&instance_id) {
+                        return Err(format!(
+                            "role policy references unknown PalWorld instance ID {}",
+                            instance_id
+                        ));
+                    }
+                }
+                Ok(RolePolicy {
+                    id: policy
+                        .id
+                        .unwrap_or_else(|| Self::next_id(&self.next_role_policy_id)),
+                    tenant_id: tenant.id,
+                    palworld_instance_id: policy.palworld_instance_id,
+                    discord_role_id: policy.discord_role_id,
+                    allowed_commands: policy.allowed_commands,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+
+        {
+            let mut tenants = self.tenants.write().unwrap();
+            let current = tenants
+                .iter_mut()
+                .find(|existing| existing.id == tenant.id)
+                .ok_or_else(|| format!("tenant {} not found", tenant.id))?;
+            current.discord_guild_id = Some(guild_id);
+            current.name = state.tenant_name;
+            current.enabled = state.enabled;
+            current.invite_allowed = state.invite_allowed;
+        }
+
+        {
+            let mut stored_instances = self.instances.write().unwrap();
+            stored_instances.retain(|instance| instance.tenant_id != tenant.id);
+            stored_instances.extend(instances);
+        }
+
+        {
+            let mut stored_policies = self.role_policies.write().unwrap();
+            stored_policies.retain(|policy| policy.tenant_id != tenant.id);
+            stored_policies.extend(role_policies);
+        }
+
+        self.get_admin_state_for_guild(guild_id)
+            .ok_or_else(|| format!("failed to rebuild tenant state for guild {}", guild_id))
     }
 }
