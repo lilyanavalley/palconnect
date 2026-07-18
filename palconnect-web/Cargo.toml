@@ -7,8 +7,8 @@ license.workspace = true
 
 [features]
 default = ["ssr"]
-ssr = []
-hydrate = []
+ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr"]
+hydrate = ["leptos/hydrate"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
