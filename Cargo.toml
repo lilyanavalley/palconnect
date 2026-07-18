@@ -1,5 +1,5 @@
 [workspace]
-members = ["palconnect-bridge", "palconnect-web"]
+members = ["palconnect-bot", "palconnect-bridge", "palconnect-web"]
 resolver = "2"
 
 [workspace.package]
@@ -29,22 +29,13 @@ version = "0.6.6"
 edition = "2024"
 
 [dependencies]
-poise = "0.6"
 tokio.workspace = true
-tokio-util.workspace = true
-reqwest.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-toml = "1.1.2"
-dotenv = "0.15"
-cargo-packager = { version = "0.11.7", default-features = false }
-cargo-packager-updater = "0.2.3"
-actix-web.workspace = true
-chrono.workspace = true
 log.workspace = true
+chrono.workspace = true
 fern = "0.7"
 clap = { version = "4.0", features = ["derive"] }
-palconnect-bridge = { path = "palconnect-bridge" }
+cargo-packager = { version = "0.11.7", default-features = false }
+palconnect-bot = { path = "palconnect-bot" }
 
 [target.'cfg(unix)'.dependencies]
 syslog = "7.0.0"
@@ -52,7 +43,7 @@ fork = "0.8.0"
 
 [features]
 default = []
-no-autoupdate = []
+no-autoupdate = ["palconnect-bot/no-autoupdate"]
 
 [package.metadata.packager]
 product-name = "PalConnect"

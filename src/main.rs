@@ -3,9 +3,9 @@
 // dP"""88""""""Y8,      ,dPYb,   ,88"""Y8b,                                                            I8   
 // Yb,  88      `8b      IP'`Yb  d8"     `Y8                                                            I8   
 //  `"  88      ,8P      I8  8I d8'   8b  d8                                                         88888888
-//      88aaaad8P"       I8  8',8I    "Y88P'                                                            I8   
-//      88""""",gggg,gg  I8 dP I8'            ,ggggg,    ,ggg,,ggg,    ,ggg,,ggg,    ,ggg,     ,gggg,   I8   
-//      88    dP"  "Y8I  I8dP  d8            dP"  "Y8ggg,8" "8P" "8,  ,8" "8P" "8,  i8" "8i   dP"  "Yb  I8   
+//      88aaaad8P"       I8 dP I8'            ,ggggg,    ,ggg,,ggg,    ,ggg,,ggg,    ,ggg,     ,gggg,   I8   
+//      88""""",gggg,gg  I8 dP  d8            dP"  "Y8ggg,8" "8P" "8,  ,8" "8P" "8,  i8" "8i   dP"  "Yb  I8   
+//      88    dP"  "Y8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,  
 //      88   i8'    ,8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,  
 //      88  ,d8,   ,d8b,,d8b,_ `Yba,,_____,,d8,   ,d8' ,dP   8I   Yb,,dP   8I   Yb, `YbadP' ,d8,_    _,d88b, 
 //      88  P"Y8888P"`Y88P'"Y88  `"Y8888888P"Y8888P"   8P'   8I   `Y88P'   8I   `Y8888P"Y888P""Y8888PP8P""Y8 
@@ -45,44 +45,15 @@
 ///
 // TODO: include documentation on *how* to use this app.
 
-use actix_web::{App, HttpServer, web};
-use cargo_packager_updater;
 use clap::Parser;
 use fern;
 #[cfg(unix)]
 use fork;
-use log::{debug, error, info, warn};
-use poise::serenity_prelude as serenity;
+use log::{error, info, warn};
 use std::fs;
 use std::io::Write;
-use std::sync::{Arc, Mutex};
-#[cfg(unix)]
-use syslog;
-use tokio::signal;
-use tokio_util::sync::CancellationToken;
 
-mod config;
-use config::*;
-mod models;
-mod services;
-use services::*;
-mod utils;
-mod glance;
-use glance::*;
-mod commands;
-use commands::*;
-mod health_check;
-use health_check::*;
-mod bridge_api;
-use bridge_api::*;
-
-
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, BotData, Error>;
-
-const UPDATE_ENDPOINT: &str =
-    "https://raw.githubusercontent.com/lilyanavalley/palconnect/refs/heads/live/.updater/latest.json";
-const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
+use palconnect_bot::{dispatcher, Error};
 
 
 #[derive(Parser)]
@@ -94,17 +65,6 @@ struct Args {
     #[cfg(unix)]
     #[arg(short, long)]
     daemon: bool,
-}
-
-// Data structure accessible in all command invocations via `ctx.data()`.
-#[derive(Clone)]
-pub struct BotData {
-    /// Tenant and PalWorld instance configuration.
-    pub tenant_store: Arc<InMemoryTenantStore>,
-    /// HTTP client for the PalWorld REST API.
-    pub palworld_client: Arc<PalworldClient>,
-    /// Authorization guard (Phase 1: always allows).
-    pub authz_guard: Arc<AuthzGuard>,
 }
 
 /// Handles the daemonization process on Unix platforms.
@@ -177,295 +137,6 @@ async fn main() -> Result<(), Error> {
     }
 
     dispatcher().await
-}
-
-async fn dispatcher() -> Result<(), Error> {
-    info!("🔧 Starting main application dispatcher...");
-    
-    let config = setup();
-
-    // * Check for updates and apply if available
-    check_and_install_updates(&config).await;
-
-    info!("🚀 Starting PalConnect bot...");
-    let servers = config.effective_palworld_servers();
-    info!(
-        "📡 Deployment mode: {}",
-        if config.multi_tenant() { "multi-tenant" } else { "single-tenant" }
-    );
-    info!("📡 PalWorld server(s) configured: {}", servers.len());
-    for s in &servers {
-        info!("   • {} — {}", s.name, s.api_url);
-    }
-
-    // Store config values we need later before moving config
-    let heartbeat_port = config.heartbeat_port.unwrap_or(8080);
-    let discord_token = config.discord_token.clone();
-    let bridge_api_token = config.bridge_api_token().map(str::to_owned);
-
-    start_services(config, discord_token, heartbeat_port, bridge_api_token).await
-}
-
-/// Checks for available updates and installs them if autoupdate is enabled.
-/// Uses cargo-packager-updater to check for new versions and install them.
-async fn check_and_install_updates(config: &Config) {
-    if config.autoupdate() {
-        info!("🔄 Autoupdate enabled, checking online for newer copy...");
-        info!("Current version number: {}", env!("CARGO_PKG_VERSION"));
-
-        let updater_config = cargo_packager_updater::Config {
-            endpoints: vec![UPDATE_ENDPOINT.parse().unwrap()],
-            pubkey: UPDATE_PUBKEY.into(),
-            ..Default::default()
-        };
-
-        match cargo_packager_updater::check_update(
-            env!("CARGO_PKG_VERSION").parse().unwrap(),
-            updater_config,
-        ) {
-            Ok(Some(update)) => {
-                info!("⬇️ Update found, downloading and installing...");
-                debug!("New version number: {}", update.version);
-                debug!("New version signature: {}", update.signature);
-                debug!("New version publish date: {:?}", update.date);
-                debug!("New version target: {}", update.target);
-
-                match update.download_and_install() {
-                    Ok(_) => {
-                        info!("🔄 Update installed successfully, restarting...");
-                        // This should restart the application
-                    }
-                    Err(e) => {
-                        error!(
-                            "🔺 Update installation failed: {}, continuing with current version",
-                            e
-                        );
-                    }
-                }
-            }
-            Ok(None) => {
-                info!("✅ No updates found, continuing startup...");
-            }
-            Err(e) => {
-                error!("🔺 Failed to check for updates: {}, continuing startup", e);
-            }
-        }
-    } else {
-        info!("⏸️ Autoupdate disabled, skipping update check");
-    }
-}
-
-/// Starts the Discord bot and Actix web server concurrently.
-/// Sets up the Discord bot with commands, starts a status updater background task,
-/// and runs the health check server. Handles graceful shutdown on Ctrl+C.
-async fn start_services(
-    config: Config,
-    discord_token: String,
-    heartbeat_port: u16,
-    bridge_api_token: Option<String>,
-) -> Result<(), Error> {
-    // Create cancellation token and JoinHandle storage for graceful shutdown
-    let cancellation_token = CancellationToken::new();
-    let status_updater_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
-    let status_updater_handle_clone = status_updater_handle.clone();
-    let cancellation_token_clone = cancellation_token.clone();
-
-    // Build the service layer
-    let tenant_store = Arc::new(InMemoryTenantStore::from_config(&config));
-    let palworld_client = Arc::new(PalworldClient::new());
-    let authz_guard = Arc::new(AuthzGuard::new());
-    let bridge_api_state = web::Data::new(BridgeApiState {
-        tenant_store: tenant_store.clone(),
-        palworld_client: palworld_client.clone(),
-        bridge_api_token,
-    });
-
-    let status_interval = config.status_update_interval();
-
-    // * Setup Discord bot
-    let framework_poise = poise::Framework::builder()
-        .options(poise::FrameworkOptions {
-            commands: vec![
-                about(),
-                players(),
-                serverinfo(),
-                help(),
-                start(),
-                stop(),
-                forcestop(),
-                settings(),
-                metrics(),
-                announce(),
-                kick(),
-                ban(),
-                unban(),
-                save(),
-                update_status(),
-            ],
-            event_handler: |ctx, event, _framework, data| {
-                Box::pin(on_event(ctx, event, data))
-            },
-            ..Default::default()
-        })
-        .setup(move |ctx, _ready, framework| {
-            let tenant_store = tenant_store.clone();
-            let palworld_client = palworld_client.clone();
-            let authz_guard = authz_guard.clone();
-            Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                
-                let bot_data = BotData {
-                    tenant_store,
-                    palworld_client,
-                    authz_guard,
-                };
-                
-                // Start the status updater background task
-                let ctx_arc = std::sync::Arc::new(ctx.clone());
-                let bot_data_arc = std::sync::Arc::new(bot_data.clone());
-                let handle = start_status_updater(ctx_arc, bot_data_arc, status_interval, cancellation_token_clone).await;
-                
-                // Store the JoinHandle for graceful shutdown
-                *status_updater_handle_clone.lock().unwrap() = Some(handle);
-                
-                Ok(bot_data)
-            })
-        })
-        .build();
-
-    let poise_intents = serenity::GatewayIntents::non_privileged();
-    let mut poise_client = serenity::ClientBuilder::new(discord_token, poise_intents)
-        .framework(framework_poise)
-        .await
-        .expect("Failed to create Discord client");
-
-    // * Setup Actix Web server
-    let actix_server = HttpServer::new(move || {
-        App::new()
-            .app_data(bridge_api_state.clone())
-            .service(health_check)
-            .service(get_guild_admin_state)
-            .service(put_guild_admin_state)
-            .service(post_test_connection)
-    })
-        .bind(("0.0.0.0", heartbeat_port))?
-        .run();
-
-    info!("✅ Starting both Discord bot and health check server...");
-
-    // * Run both services concurrently with graceful shutdown
-    tokio::select! {
-        result = poise_client.start() => {
-            error!("Discord bot stopped: {:?}", result);
-            result?;
-        }
-        result = actix_server => {
-            error!("Actix server stopped: {:?}", result);
-            result?;
-        }
-        _ = signal::ctrl_c() => {
-            info!("🛑 Received Ctrl+C, shutting down gracefully...");
-        }
-    }
-
-    // Cancel the status updater and wait for it to finish
-    info!("🛑 Cancelling status updater...");
-    cancellation_token.cancel();
-    
-    let handle = status_updater_handle.lock().unwrap().take();
-    if let Some(handle) = handle {
-        match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
-            Ok(_) => info!("✅ Status updater stopped gracefully"),
-            Err(_) => warn!("⚠️ Status updater did not stop within timeout"),
-        }
-    }
-
-    info!("👋 Shutdown complete");
-    Ok(())
-}
-
-/// Handle Discord gateway events that require bot-level reactions.
-///
-/// Currently handles:
-/// - `GuildCreate` — invite gate (single-tenant: reject if already bound to another guild;
-///   multi-tenant with `invite_enabled = false`: reject all new joins)
-async fn on_event<'a>(
-    ctx: &'a serenity::Context,
-    event: &'a serenity::FullEvent,
-    data: &'a BotData,
-) -> Result<(), Error> {
-    let serenity::FullEvent::GuildCreate { guild, is_new } = event else {
-        return Ok(());
-    };
-
-    let store = &data.tenant_store;
-
-    if *is_new == Some(true) {
-        // New guild join
-        if !store.is_multi_tenant() {
-            // Single-tenant mode
-            let bound = store.get_single_tenant_guild_id();
-            match bound {
-                None => {
-                    // First guild to join — bind the single tenant to it.
-                    store.bind_single_tenant_guild(guild.id.get());
-                    info!("🔗 Single-tenant: bound to guild {} ({})", guild.name, guild.id);
-                }
-                Some(bound_id) if bound_id != guild.id.get() => {
-                    // Already bound to a different guild — reject this new invite.
-                    warn!(
-                        "🚫 Single-tenant: rejecting invite from guild {} ({}); already bound to {}",
-                        guild.name, guild.id, bound_id
-                    );
-                    let msg = concat!(
-                        "⚠️ This PalConnect instance is configured for **single-guild use** and is ",
-                        "already serving another server.\n\n",
-                        "To use PalConnect for your community, please deploy your own instance: ",
-                        "<https://github.com/lilyanavalley/palconnect>"
-                    );
-                    if let Some(ch) = guild.system_channel_id {
-                        let _ = ch.say(&ctx.http, msg).await;
-                    }
-                    let _ = guild.id.leave(&ctx.http).await;
-                }
-                Some(_) => {
-                    // Re-invited to the same guild (e.g. bot was removed and re-added).
-                    info!("🔗 Single-tenant: re-joined already-bound guild {} ({})", guild.name, guild.id);
-                }
-            }
-        } else if !store.is_invite_allowed() {
-            // Multi-tenant mode but new invites are disabled.
-            warn!(
-                "🚫 Multi-tenant: invites disabled — rejecting guild {} ({})",
-                guild.name, guild.id
-            );
-            let msg = concat!(
-                "⚠️ This PalConnect instance is **not currently accepting new server invites**.\n\n",
-                "Contact the bot operator for access, or deploy your own instance: ",
-                "<https://github.com/lilyanavalley/palconnect>"
-            );
-            if let Some(ch) = guild.system_channel_id {
-                let _ = ch.say(&ctx.http, msg).await;
-            }
-            let _ = guild.id.leave(&ctx.http).await;
-        } else {
-            // Multi-tenant mode with invites enabled — welcome the new guild.
-            info!("🎉 Multi-tenant: new guild joined — {} ({})", guild.name, guild.id);
-            data.tenant_store
-                .ensure_admin_state_for_guild(guild.id.get(), &guild.name);
-        }
-    } else if *is_new == Some(false) {
-        // Startup resume — bind the single tenant to the first guild seen if not yet bound.
-        if !store.is_multi_tenant() && store.get_single_tenant_guild_id().is_none() {
-            store.bind_single_tenant_guild(guild.id.get());
-            info!(
-                "🔗 Single-tenant: bound to existing guild {} ({}) at startup",
-                guild.name, guild.id
-            );
-        }
-    }
-
-    Ok(())
 }
 
 #[cfg(unix)]

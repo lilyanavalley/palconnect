@@ -1,0 +1,25 @@
+[package]
+name = "palconnect-bot"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = []
+no-autoupdate = []
+
+[dependencies]
+poise = "0.6"
+tokio.workspace = true
+tokio-util.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml = "1.1.2"
+dotenv = "0.15"
+cargo-packager-updater = "0.2.3"
+actix-web.workspace = true
+chrono.workspace = true
+log.workspace = true
+palconnect-bridge = { path = "../palconnect-bridge" }
