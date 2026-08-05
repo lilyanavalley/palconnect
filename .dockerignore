@@ -1,8 +1,0 @@
-.do/
-.github/
-.vscode/
-
-scripts/
-target/
-
-**/*.example

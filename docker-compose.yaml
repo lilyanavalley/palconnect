@@ -1,0 +1,47 @@
+
+version: '3'
+
+
+services:
+
+  palconnect-web:
+    build:
+      context: ./palconnect-web
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - 8080:8080
+    depends_on:
+      - surrealdb
+    networks:
+      - private
+
+  # palconnect-bot:
+  #   build:
+  #     context: ./palconnect-bot
+  #     dockerfile: Dockerfile
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - surrealdb
+
+  surrealdb:
+    env_file:
+      - .env
+    entrypoint: 
+      - /surreal 
+      - start 
+      - --user
+      - $DB_USER
+      - --pass
+      - $DB_PASSWORD
+    image: surrealdb/surrealdb:latest
+    ports:
+      - 8000:8000
+    networks:
+      - private
+
+networks:
+  private:
+    driver: bridge

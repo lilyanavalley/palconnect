@@ -1,6 +1,10 @@
+
 # Rust
 /target/
 Cargo.lock
+
+# NodeJS
+node_modules/
 
 # Environment variables + configuration files
 .env
@@ -25,3 +29,6 @@ Thumbs.db
 *.pem
 *.p12
 *.pfx
+
+# Generated filess
+/site

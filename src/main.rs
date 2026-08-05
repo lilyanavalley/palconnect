@@ -1,50 +1,49 @@
-// 
-//  ,ggggggggggg,                   ,gggg,                                                                   
-// dP"""88""""""Y8,      ,dPYb,   ,88"""Y8b,                                                            I8   
-// Yb,  88      `8b      IP'`Yb  d8"     `Y8                                                            I8   
+//
+//  ,ggggggggggg,                   ,gggg,
+// dP"""88""""""Y8,      ,dPYb,   ,88"""Y8b,                                                            I8
+// Yb,  88      `8b      IP'`Yb  d8"     `Y8                                                            I8
 //  `"  88      ,8P      I8  8I d8'   8b  d8                                                         88888888
-//      88aaaad8P"       I8 dP I8'            ,ggggg,    ,ggg,,ggg,    ,ggg,,ggg,    ,ggg,     ,gggg,   I8   
-//      88""""",gggg,gg  I8 dP  d8            dP"  "Y8ggg,8" "8P" "8,  ,8" "8P" "8,  i8" "8i   dP"  "Yb  I8   
-//      88    dP"  "Y8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,  
-//      88   i8'    ,8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,  
-//      88  ,d8,   ,d8b,,d8b,_ `Yba,,_____,,d8,   ,d8' ,dP   8I   Yb,,dP   8I   Yb, `YbadP' ,d8,_    _,d88b, 
-//      88  P"Y8888P"`Y88P'"Y88  `"Y8888888P"Y8888P"   8P'   8I   `Y88P'   8I   `Y8888P"Y888P""Y8888PP8P""Y8 
-// 
+//      88aaaad8P"       I8 dP I8'            ,ggggg,    ,ggg,,ggg,    ,ggg,,ggg,    ,ggg,     ,gggg,   I8
+//      88""""",gggg,gg  I8 dP  d8            dP"  "Y8ggg,8" "8P" "8,  ,8" "8P" "8,  i8" "8i   dP"  "Yb  I8
+//      88    dP"  "Y8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,
+//      88   i8'    ,8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,
+//      88  ,d8,   ,d8b,,d8b,_ `Yba,,_____,,d8,   ,d8' ,dP   8I   Yb,,dP   8I   Yb, `YbadP' ,d8,_    _,d88b,
+//      88  P"Y8888P"`Y88P'"Y88  `"Y8888888P"Y8888P"   8P'   8I   `Y88P'   8I   `Y8888P"Y888P""Y8888PP8P""Y8
+//
 //                                A Discord bot for PalWorld server monitoring
-// 
+//
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 
+//
 // © Lily Ana Valley <hi@lilyvalley.dev>, 2025
 // 🪪 LICENSE: AGPL-3
-// 
+//
 // PalConnect - A Discord bot for PalWorld server monitoring
 // Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
 //
-// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
-// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
 // any later version.
 //
-// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
 // warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
 // details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 // <https://www.gnu.org/licenses/>.
-// 
+//
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 
+//
 /// PalConnect is a cross-server connector between a PalWorld dedicated server and a Discord server.
-/// Using the REST API of a PalWorld server, it's possible to administrate one's world and allow players to check on 
+/// Using the REST API of a PalWorld server, it's possible to administrate one's world and allow players to check on
 /// their world from Discord.
-/// 
-/// 🚧 PalConnect is pre-release software until version `1.0.0` is published. Observations of bot instability, feature 
+///
+/// 🚧 PalConnect is pre-release software until version `1.0.0` is published. Observations of bot instability, feature
 /// changes and inconsistency is to be expected.
-/// 
+///
 /// Leave your feedback on the [GitHub Repo](https://github.com/lilyanavalley/palconnect) to help improve this
 /// software.
 ///
 // TODO: include documentation on *how* to use this app.
-
 use clap::Parser;
 use fern;
 #[cfg(unix)]
@@ -53,8 +52,7 @@ use log::{error, info, warn};
 use std::fs;
 use std::io::Write;
 
-use palconnect_bot::{dispatcher, Error};
-
+use palconnect_bot::{Error, dispatcher};
 
 #[derive(Parser)]
 #[command(name = "palconnect")]
