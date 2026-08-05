@@ -19,6 +19,7 @@ use serde::Deserialize;
 use std::time::Duration;
 
 use crate::models::PalworldInstance;
+use crate::config::PalworldServerConfig;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -88,6 +89,10 @@ impl PalworldClient {
 
     fn url(instance: &PalworldInstance, path: &str) -> String {
         format!("{}{}", instance.api_url.trim_end_matches('/'), path)
+    }
+
+    fn url_from_server(server: &PalworldServerConfig, path: &str) -> String {
+        format!("{}{}", server.api_url.trim_end_matches('/'), path)
     }
 
     // ─── Read operations ──────────────────────────────────────────────────
@@ -275,6 +280,51 @@ impl PalworldClient {
             .post(Self::url(instance, "/v1/api/stop"))
             .basic_auth("admin", Some(&instance.admin_password))
             .timeout(Duration::from_secs(3))
+            .send()
+            .await?;
+        Ok(resp.status())
+    }
+
+    pub async fn check_online_server(&self, server: &PalworldServerConfig) -> bool {
+        self.http
+            .get(Self::url_from_server(server, "/v1/api/info"))
+            .basic_auth("admin", Some(&server.admin_password))
+            .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS))
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
+    }
+
+    pub async fn announce_server(&self, server: &PalworldServerConfig, message: &str) -> Result<(), Error> {
+        let resp = self
+            .http
+            .post(Self::url_from_server(server, "/v1/api/announce"))
+            .basic_auth("admin", Some(&server.admin_password))
+            .header("Content-Type", "application/json")
+            .body(serde_json::json!({ "message": message }).to_string())
+            .send()
+            .await?;
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            Err(format!("HTTP {} — {}", status, body).into())
+        }
+    }
+
+    pub async fn shutdown_server(
+        &self,
+        server: &PalworldServerConfig,
+        waittime: u64,
+        message: &str,
+    ) -> Result<StatusCode, Error> {
+        let resp = self
+            .http
+            .post(Self::url_from_server(server, "/v1/api/shutdown"))
+            .basic_auth("admin", Some(&server.admin_password))
+            .body(serde_json::json!({ "waittime": waittime, "message": message }).to_string())
             .send()
             .await?;
         Ok(resp.status())

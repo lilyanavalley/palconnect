@@ -163,13 +163,17 @@ pub async fn start_services(
     // Create cancellation token and JoinHandle storage for graceful shutdown
     let cancellation_token = CancellationToken::new();
     let status_updater_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
+    let steamdb_updater_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
     let status_updater_handle_clone = status_updater_handle.clone();
+    let steamdb_updater_handle_clone = steamdb_updater_handle.clone();
     let cancellation_token_clone = cancellation_token.clone();
+    let updater_cancellation_token_clone = cancellation_token.clone();
 
     // Build the service layer
     let tenant_store = Arc::new(InMemoryTenantStore::from_config(&config));
     let palworld_client = Arc::new(PalworldClient::new());
     let authz_guard = Arc::new(AuthzGuard::new());
+    let config = Arc::new(config);
     let bridge_api_state = web::Data::new(BridgeApiState {
         tenant_store: tenant_store.clone(),
         palworld_client: palworld_client.clone(),
@@ -204,6 +208,7 @@ pub async fn start_services(
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {
+            let config = config.clone();
             let tenant_store = tenant_store.clone();
             let palworld_client = palworld_client.clone();
             let authz_guard = authz_guard.clone();
@@ -212,7 +217,7 @@ pub async fn start_services(
                 
                 let bot_data = BotData {
                     tenant_store,
-                    palworld_client,
+                    palworld_client: palworld_client.clone(),
                     authz_guard,
                 };
                 
@@ -223,6 +228,11 @@ pub async fn start_services(
                 
                 // Store the JoinHandle for graceful shutdown
                 *status_updater_handle_clone.lock().unwrap() = Some(handle);
+                *steamdb_updater_handle_clone.lock().unwrap() = start_steamdb_updater(
+                    config,
+                    palworld_client.clone(),
+                    updater_cancellation_token_clone,
+                );
                 
                 Ok(bot_data)
             })
@@ -273,6 +283,14 @@ pub async fn start_services(
         match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
             Ok(_) => info!("✅ Status updater stopped gracefully"),
             Err(_) => warn!("⚠️ Status updater did not stop within timeout"),
+        }
+    }
+
+    let updater_handle = steamdb_updater_handle.lock().unwrap().take();
+    if let Some(handle) = updater_handle {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
+            Ok(_) => info!("✅ SteamDB updater stopped gracefully"),
+            Err(_) => warn!("⚠️ SteamDB updater did not stop within timeout"),
         }
     }
 
