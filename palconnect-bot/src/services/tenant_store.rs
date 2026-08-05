@@ -1,18 +1,18 @@
-// 
+//
 // PalConnect - A Discord bot for PalWorld server monitoring
 // Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
 //
-// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
-// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
 // any later version.
 //
-// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
 // warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
 // details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 // <https://www.gnu.org/licenses/>.
-// 
+//
 
 use std::sync::RwLock;
 
@@ -89,8 +89,7 @@ pub trait TenantStore: Send + Sync {
 const ERR_NOT_CONFIGURED: &str =
     "⚠️ This server has not been configured yet. Please contact your administrator.";
 const ERR_DISABLED: &str = "⚠️ PalConnect is currently disabled for this server.";
-const ERR_NO_INSTANCE: &str =
-    "⚠️ No PalWorld server has been configured for this Discord server. Please contact your administrator.";
+const ERR_NO_INSTANCE: &str = "⚠️ No PalWorld server has been configured for this Discord server. Please contact your administrator.";
 pub const DEFAULT_NEW_TENANT_NAME: &str = "Unnamed Guild";
 
 // ─── Convenience helpers ─────────────────────────────────────────────────────
@@ -99,7 +98,10 @@ pub const DEFAULT_NEW_TENANT_NAME: &str = "Unnamed Guild";
 ///
 /// Returns the instance marked `is_primary`, falling back to the first enabled instance.
 /// Returns `None` if the tenant has no enabled instances.
-pub fn resolve_primary_instance(store: &dyn TenantStore, tenant_id: u64) -> Option<PalworldInstance> {
+pub fn resolve_primary_instance(
+    store: &dyn TenantStore,
+    tenant_id: u64,
+) -> Option<PalworldInstance> {
     let instances = store.get_instances_for_tenant(tenant_id);
     let enabled: Vec<_> = instances.into_iter().filter(|i| i.enabled).collect();
     enabled
@@ -124,8 +126,7 @@ pub fn resolve_tenant_and_instance(
         return Err(ERR_DISABLED.to_string());
     }
 
-    let instance = resolve_primary_instance(store, tenant.id)
-        .ok_or(ERR_NO_INSTANCE)?;
+    let instance = resolve_primary_instance(store, tenant.id).ok_or(ERR_NO_INSTANCE)?;
 
     Ok((tenant, instance))
 }

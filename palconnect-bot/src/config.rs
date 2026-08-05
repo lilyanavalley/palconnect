@@ -1,26 +1,25 @@
-// 
+//
 // PalConnect - A Discord bot for PalWorld server monitoring
 // Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
 //
-// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
-// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
 // any later version.
 //
-// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
 // warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
 // details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 // <https://www.gnu.org/licenses/>.
-// 
+//
 
+use log::{debug, error, trace};
+use serde::Deserialize;
+use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::env;
 use toml;
-use serde::Deserialize;
-use log::{ trace, debug, error };
-
 
 const CONFIG_LOCATIONS: [&str; 3] = [
     "./Config.toml",
@@ -80,12 +79,12 @@ pub struct Config {
     pub palworld_admin_password: Option<String>,
 
     // ── Optional bot settings ─────────────────────────────────────────────────
-    pub enable_autoupdate:      Option<bool>,
-    pub heartbeat_port:         Option<u16>,
-    pub bridge_api_token:       Option<String>,
+    pub enable_autoupdate: Option<bool>,
+    pub heartbeat_port: Option<u16>,
+    pub bridge_api_token: Option<String>,
     /// How often (in seconds) the bot polls PalWorld servers and updates status.  Min 15.
     pub status_update_interval: Option<u64>,
-    pub logging:                Option<Logging>,
+    pub logging: Option<Logging>,
 }
 
 impl Config {
@@ -102,8 +101,7 @@ impl Config {
     }
 
     pub fn invite_allowed(&self) -> bool {
-        self.invite_enabled
-            .unwrap_or_else(|| self.multi_tenant()) // default: allowed iff multi-tenant
+        self.invite_enabled.unwrap_or_else(|| self.multi_tenant()) // default: allowed iff multi-tenant
     }
 
     pub fn bridge_api_token(&self) -> Option<&str> {
@@ -124,7 +122,10 @@ impl Config {
             }
         }
         // Legacy fallback
-        let url = self.palworld_api_url.clone().unwrap_or_else(|| DEFAULT_PALWORLD_API_URL.to_string());
+        let url = self
+            .palworld_api_url
+            .clone()
+            .unwrap_or_else(|| DEFAULT_PALWORLD_API_URL.to_string());
         let password = self.palworld_admin_password.clone().unwrap_or_default();
         vec![PalworldServerConfig {
             name: "PalWorld Server".to_string(),
@@ -137,17 +138,17 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            discord_token:              String::new(),
-            multi_tenant:               None,
-            invite_enabled:             None,
-            palworld_servers:           None,
-            palworld_api_url:           Some(String::from("http://localhost:8212/")),
-            palworld_admin_password:    Some(String::new()),
-            enable_autoupdate:          None,
-            heartbeat_port:             None,
-            bridge_api_token:           None,
-            status_update_interval:     None,
-            logging:                    None,
+            discord_token: String::new(),
+            multi_tenant: None,
+            invite_enabled: None,
+            palworld_servers: None,
+            palworld_api_url: Some(String::from("http://localhost:8212/")),
+            palworld_admin_password: Some(String::new()),
+            enable_autoupdate: None,
+            heartbeat_port: None,
+            bridge_api_token: None,
+            status_update_interval: None,
+            logging: None,
         }
     }
 }
@@ -161,22 +162,20 @@ pub struct Logging {
 }
 
 pub fn setup() -> Config {
-    
     let mut config_buffer = Vec::new();
     for location in CONFIG_LOCATIONS.iter() {
         trace!("Checking for config file at: {}", location);
         if let Ok(mut file) = File::open(location) {
             trace!("Reading config file at: {}", location);
-            file.read_to_end(&mut config_buffer).expect("Failed to read config file");
+            file.read_to_end(&mut config_buffer)
+                .expect("Failed to read config file");
             trace!("End read.");
             debug!("Using config file at: {}", location);
             break;
         }
     }
     let mut config = toml::de::from_slice(&config_buffer)
-        .map(|config: Config| {
-            config
-        })
+        .map(|config: Config| config)
         .unwrap_or_else(|e| {
             // * NOTE: If config parsing fails, we return a default config.
             // ? Do we want to parse the remainder of the config locations instead?
@@ -198,29 +197,32 @@ pub fn setup() -> Config {
     if let Ok(palworld_api_url) = env::var("PALWORLD_API_URL") {
         config.palworld_api_url = Some(palworld_api_url);
     }
-    
+
     if let Ok(admin_password) = env::var("PALWORLD_ADMIN_PASSWORD") {
         config.palworld_admin_password = Some(admin_password);
     }
 
     if let Ok(val) = env::var("MULTI_TENANT") {
         config.multi_tenant = Some(
-            val.to_lowercase().parse::<bool>()
+            val.to_lowercase()
+                .parse::<bool>()
                 .expect("Failed to parse MULTI_TENANT as bool. Expected 'true' or 'false'"),
         );
     }
 
     if let Ok(val) = env::var("INVITE_ENABLED") {
         config.invite_enabled = Some(
-            val.to_lowercase().parse::<bool>()
+            val.to_lowercase()
+                .parse::<bool>()
                 .expect("Failed to parse INVITE_ENABLED as bool. Expected 'true' or 'false'"),
         );
     }
-    
+
     if let Ok(heartbeat_port) = env::var("HEARTBEAT_PORT") {
         config.heartbeat_port = Some(
-            heartbeat_port.parse::<u16>()
-                .expect("Failed to parse HEARTBEAT_PORT as u16")
+            heartbeat_port
+                .parse::<u16>()
+                .expect("Failed to parse HEARTBEAT_PORT as u16"),
         );
     }
 
@@ -231,10 +233,8 @@ pub fn setup() -> Config {
     // Check for autoupdate and status interval env vars
     if let Ok(update_enable) = env::var("UPDATES_AUTO_ENABLE") {
         config.enable_autoupdate = Some(
-            <bool as std::str::FromStr>::from_str(
-                update_enable.to_lowercase().as_str(),
-            )
-            .expect("Failed to parse UPDATES_AUTO_ENABLE as bool")
+            <bool as std::str::FromStr>::from_str(update_enable.to_lowercase().as_str())
+                .expect("Failed to parse UPDATES_AUTO_ENABLE as bool"),
         );
     }
 
@@ -246,14 +246,17 @@ pub fn setup() -> Config {
     }
 
     if let Ok(status_interval) = env::var("STATUS_UPDATE_INTERVAL") {
-        let interval = status_interval.parse::<u64>()
+        let interval = status_interval
+            .parse::<u64>()
             .expect("Failed to parse STATUS_UPDATE_INTERVAL as u64");
         if interval < 15 {
-            panic!("STATUS_UPDATE_INTERVAL must be at least 15 seconds to avoid excessive API polling (got {}).", interval);
+            panic!(
+                "STATUS_UPDATE_INTERVAL must be at least 15 seconds to avoid excessive API polling (got {}).",
+                interval
+            );
         }
         config.status_update_interval = Some(interval);
     }
 
     config
-
 }

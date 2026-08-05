@@ -1,36 +1,36 @@
-// 
-//  ,ggggggggggg,                   ,gggg,                                                                   
-// dP"""88""""""Y8,      ,dPYb,   ,88"""Y8b,                                                            I8   
-// Yb,  88      `8b      IP'`Yb  d8"     `Y8                                                            I8   
+//
+//  ,ggggggggggg,                   ,gggg,
+// dP"""88""""""Y8,      ,dPYb,   ,88"""Y8b,                                                            I8
+// Yb,  88      `8b      IP'`Yb  d8"     `Y8                                                            I8
 //  `"  88      ,8P      I8  8I d8'   8b  d8                                                         88888888
-//      88aaaad8P"       I8 dP I8'            ,ggggg,    ,ggg,,ggg,    ,ggg,,ggg,    ,ggg,     ,gggg,   I8   
-//      88""""",gggg,gg  I8 dP  d8            dP"  "Y8ggg,8" "8P" "8,  ,8" "8P" "8,  i8" "8i   dP"  "Yb  I8   
-//      88    dP"  "Y8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,  
-//      88   i8'    ,8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,  
-//      88  ,d8,   ,d8b,,d8b,_ `Yba,,_____,,d8,   ,d8' ,dP   8I   Yb,,dP   8I   Yb, `YbadP' ,d8,_    _,d88b, 
-//      88  P"Y8888P"`Y88P'"Y88  `"Y8888888P"Y8888P"   8P'   8I   `Y88P'   8I   `Y8888P"Y888P""Y8888PP8P""Y8 
-// 
+//      88aaaad8P"       I8 dP I8'            ,ggggg,    ,ggg,,ggg,    ,ggg,,ggg,    ,ggg,     ,gggg,   I8
+//      88""""",gggg,gg  I8 dP  d8            dP"  "Y8ggg,8" "8P" "8,  ,8" "8P" "8,  i8" "8i   dP"  "Yb  I8
+//      88    dP"  "Y8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,
+//      88   i8'    ,8I  I8P   Y8,          i8'    ,8I  I8   8I   8I  I8   8I   8I  I8, ,8I  i8'       ,I8,
+//      88  ,d8,   ,d8b,,d8b,_ `Yba,,_____,,d8,   ,d8' ,dP   8I   Yb,,dP   8I   Yb, `YbadP' ,d8,_    _,d88b,
+//      88  P"Y8888P"`Y88P'"Y88  `"Y8888888P"Y8888P"   8P'   8I   `Y88P'   8I   `Y8888P"Y888P""Y8888PP8P""Y8
+//
 //                                A Discord bot for PalWorld server monitoring
-// 
+//
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 
+//
 // © Lily Ana Valley <hi@lilyvalley.dev>, 2025
 // 🪪 LICENSE: AGPL-3
-// 
+//
 // PalConnect - A Discord bot for PalWorld server monitoring
 // Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
 //
-// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
-// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
 // any later version.
 //
-// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
 // warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
 // details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 // <https://www.gnu.org/licenses/>.
-// 
+//
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 use actix_web::{App, HttpServer, web};
@@ -45,8 +45,8 @@ pub use config::*;
 pub mod models;
 pub mod services;
 pub use services::*;
-pub mod utils;
 pub mod glance;
+pub mod utils;
 pub use glance::*;
 pub mod commands;
 pub use commands::*;
@@ -55,14 +55,11 @@ pub use health_check::*;
 pub mod bridge_api;
 pub use bridge_api::*;
 
-
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, BotData, Error>;
 
-pub const UPDATE_ENDPOINT: &str =
-    "https://raw.githubusercontent.com/lilyanavalley/palconnect/refs/heads/live/.updater/latest.json";
+pub const UPDATE_ENDPOINT: &str = "https://raw.githubusercontent.com/lilyanavalley/palconnect/refs/heads/live/.updater/latest.json";
 pub const UPDATE_PUBKEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDOTAzRTg4OUIwN0QwMzEKUldReDBBZWJpRDZRUE40MVFVUklML3g4aVFFRTgvSTlad3hjWDl5UUljbFNEVGJUei9uL0M1SFEK";
-
 
 // Data structure accessible in all command invocations via `ctx.data()`.
 #[derive(Clone)]
@@ -77,7 +74,7 @@ pub struct BotData {
 
 pub async fn dispatcher() -> Result<(), Error> {
     info!("🔧 Starting main application dispatcher...");
-    
+
     let config = setup();
 
     // * Check for updates and apply if available
@@ -87,7 +84,11 @@ pub async fn dispatcher() -> Result<(), Error> {
     let servers = config.effective_palworld_servers();
     info!(
         "📡 Deployment mode: {}",
-        if config.multi_tenant() { "multi-tenant" } else { "single-tenant" }
+        if config.multi_tenant() {
+            "multi-tenant"
+        } else {
+            "single-tenant"
+        }
     );
     info!("📡 PalWorld server(s) configured: {}", servers.len());
     for s in &servers {
@@ -162,7 +163,8 @@ pub async fn start_services(
 ) -> Result<(), Error> {
     // Create cancellation token and JoinHandle storage for graceful shutdown
     let cancellation_token = CancellationToken::new();
-    let status_updater_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
+    let status_updater_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>> =
+        Arc::new(Mutex::new(None));
     let status_updater_handle_clone = status_updater_handle.clone();
     let cancellation_token_clone = cancellation_token.clone();
 
@@ -198,9 +200,7 @@ pub async fn start_services(
                 save(),
                 update_status(),
             ],
-            event_handler: |ctx, event, _framework, data| {
-                Box::pin(on_event(ctx, event, data))
-            },
+            event_handler: |ctx, event, _framework, data| Box::pin(on_event(ctx, event, data)),
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {
@@ -209,21 +209,27 @@ pub async fn start_services(
             let authz_guard = authz_guard.clone();
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                
+
                 let bot_data = BotData {
                     tenant_store,
                     palworld_client,
                     authz_guard,
                 };
-                
+
                 // Start the status updater background task
                 let ctx_arc = std::sync::Arc::new(ctx.clone());
                 let bot_data_arc = std::sync::Arc::new(bot_data.clone());
-                let handle = start_status_updater(ctx_arc, bot_data_arc, status_interval, cancellation_token_clone).await;
-                
+                let handle = start_status_updater(
+                    ctx_arc,
+                    bot_data_arc,
+                    status_interval,
+                    cancellation_token_clone,
+                )
+                .await;
+
                 // Store the JoinHandle for graceful shutdown
                 *status_updater_handle_clone.lock().unwrap() = Some(handle);
-                
+
                 Ok(bot_data)
             })
         })
@@ -244,8 +250,8 @@ pub async fn start_services(
             .service(put_guild_admin_state)
             .service(post_test_connection)
     })
-        .bind(("0.0.0.0", heartbeat_port))?
-        .run();
+    .bind(("0.0.0.0", heartbeat_port))?
+    .run();
 
     info!("✅ Starting both Discord bot and health check server...");
 
@@ -267,7 +273,7 @@ pub async fn start_services(
     // Cancel the status updater and wait for it to finish
     info!("🛑 Cancelling status updater...");
     cancellation_token.cancel();
-    
+
     let handle = status_updater_handle.lock().unwrap().take();
     if let Some(handle) = handle {
         match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
@@ -305,7 +311,10 @@ async fn on_event<'a>(
                 None => {
                     // First guild to join — bind the single tenant to it.
                     store.bind_single_tenant_guild(guild.id.get());
-                    info!("🔗 Single-tenant: bound to guild {} ({})", guild.name, guild.id);
+                    info!(
+                        "🔗 Single-tenant: bound to guild {} ({})",
+                        guild.name, guild.id
+                    );
                 }
                 Some(bound_id) if bound_id != guild.id.get() => {
                     // Already bound to a different guild — reject this new invite.
@@ -326,7 +335,10 @@ async fn on_event<'a>(
                 }
                 Some(_) => {
                     // Re-invited to the same guild (e.g. bot was removed and re-added).
-                    info!("🔗 Single-tenant: re-joined already-bound guild {} ({})", guild.name, guild.id);
+                    info!(
+                        "🔗 Single-tenant: re-joined already-bound guild {} ({})",
+                        guild.name, guild.id
+                    );
                 }
             }
         } else if !store.is_invite_allowed() {
@@ -346,7 +358,10 @@ async fn on_event<'a>(
             let _ = guild.id.leave(&ctx.http).await;
         } else {
             // Multi-tenant mode with invites enabled — welcome the new guild.
-            info!("🎉 Multi-tenant: new guild joined — {} ({})", guild.name, guild.id);
+            info!(
+                "🎉 Multi-tenant: new guild joined — {} ({})",
+                guild.name, guild.id
+            );
             data.tenant_store
                 .ensure_admin_state_for_guild(guild.id.get(), &guild.name);
         }

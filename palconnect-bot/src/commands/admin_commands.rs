@@ -1,28 +1,27 @@
-// 
+//
 // PalConnect - A Discord bot for PalWorld server monitoring
 // Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
 //
-// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
-// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
 // any later version.
 //
-// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
 // warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
 // details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 // <https://www.gnu.org/licenses/>.
-// 
+//
 
 use poise::serenity_prelude as serenity;
 
 use crate::commands::instance_selector::{
-    build_multi_result_embed, find_instance_by_name, prompt_mutating_target, InstanceTarget,
+    InstanceTarget, build_multi_result_embed, find_instance_by_name, prompt_mutating_target,
 };
 use crate::services::{resolve_tenant_and_all_instances, resolve_tenant_and_instance};
 use crate::utils::sanitize_sensitive_data;
 use crate::{Context, Error};
-
 
 // ─── Read-only commands ───────────────────────────────────────────────────────
 
@@ -42,10 +41,8 @@ pub async fn settings(
             match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
                 Ok(pair) => pair,
                 Err(msg) => {
-                    ctx.send(
-                        poise::CreateReply::default().content(msg).ephemeral(true),
-                    )
-                    .await?;
+                    ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
+                        .await?;
                     return Ok(());
                 }
             };
@@ -62,17 +59,14 @@ pub async fn settings(
             }
         }
     } else {
-        let (_tenant, inst) =
-            match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
-                Ok(pair) => pair,
-                Err(msg) => {
-                    ctx.send(
-                        poise::CreateReply::default().content(msg).ephemeral(true),
-                    )
+        let (_tenant, inst) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+            Ok(pair) => pair,
+            Err(msg) => {
+                ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
                     .await?;
-                    return Ok(());
-                }
-            };
+                return Ok(());
+            }
+        };
         inst
     };
 
@@ -80,14 +74,12 @@ pub async fn settings(
         Ok(raw_settings) => {
             let sanitized = sanitize_sensitive_data(raw_settings);
             ctx.send(
-                poise::CreateReply::default().attachment(
-                    serenity::CreateAttachment::bytes(
-                        serde_json::to_vec_pretty(&sanitized).unwrap_or_else(|err| {
-                            format!("Failed to serialize settings: {}", err).into_bytes()
-                        }),
-                        "palworld_settings.json",
-                    ),
-                ),
+                poise::CreateReply::default().attachment(serenity::CreateAttachment::bytes(
+                    serde_json::to_vec_pretty(&sanitized).unwrap_or_else(|err| {
+                        format!("Failed to serialize settings: {}", err).into_bytes()
+                    }),
+                    "palworld_settings.json",
+                )),
             )
             .await?;
         }
@@ -123,10 +115,8 @@ pub async fn metrics(
             match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
                 Ok(pair) => pair,
                 Err(msg) => {
-                    ctx.send(
-                        poise::CreateReply::default().content(msg).ephemeral(true),
-                    )
-                    .await?;
+                    ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
+                        .await?;
                     return Ok(());
                 }
             };
@@ -143,17 +133,14 @@ pub async fn metrics(
             }
         }
     } else {
-        let (_tenant, inst) =
-            match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
-                Ok(pair) => pair,
-                Err(msg) => {
-                    ctx.send(
-                        poise::CreateReply::default().content(msg).ephemeral(true),
-                    )
+        let (_tenant, inst) = match resolve_tenant_and_instance(&*data.tenant_store, guild_id) {
+            Ok(pair) => pair,
+            Err(msg) => {
+                ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
                     .await?;
-                    return Ok(());
-                }
-            };
+                return Ok(());
+            }
+        };
         inst
     };
 
@@ -202,15 +189,15 @@ pub async fn announce(
 ) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().map(|g| g.get());
-    let (_tenant, instances) =
-        match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
-            Ok(pair) => pair,
-            Err(msg) => {
-                ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
-                    .await?;
-                return Ok(());
-            }
-        };
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id)
+    {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
+                .await?;
+            return Ok(());
+        }
+    };
 
     let target = match prompt_mutating_target(ctx, instances).await? {
         Some(t) => t,
@@ -222,12 +209,10 @@ pub async fn announce(
             ctx.defer().await?;
             match data.palworld_client.announce(&instance, &message).await {
                 Ok(()) => {
-                    ctx.send(
-                        poise::CreateReply::default().content(format!(
-                            "📢 Announcement sent to **{}**: \"{}\"",
-                            instance.display_name, message
-                        )),
-                    )
+                    ctx.send(poise::CreateReply::default().content(format!(
+                        "📢 Announcement sent to **{}**: \"{}\"",
+                        instance.display_name, message
+                    )))
                     .await?;
                 }
                 Err(e) => {
@@ -254,12 +239,10 @@ pub async fn announce(
                 results.push((instance.display_name.clone(), outcome));
             }
             ctx.send(
-                poise::CreateReply::default().embed(
-                    build_multi_result_embed(
-                        format!("📢 Announcement — \"{}\"", message),
-                        results,
-                    ),
-                ),
+                poise::CreateReply::default().embed(build_multi_result_embed(
+                    format!("📢 Announcement — \"{}\"", message),
+                    results,
+                )),
             )
             .await?;
         }
@@ -277,15 +260,15 @@ pub async fn kick(
 ) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().map(|g| g.get());
-    let (_tenant, instances) =
-        match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
-            Ok(pair) => pair,
-            Err(msg) => {
-                ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
-                    .await?;
-                return Ok(());
-            }
-        };
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id)
+    {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
+                .await?;
+            return Ok(());
+        }
+    };
 
     let target = match prompt_mutating_target(ctx, instances).await? {
         Some(t) => t,
@@ -358,15 +341,15 @@ pub async fn ban(
 ) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().map(|g| g.get());
-    let (_tenant, instances) =
-        match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
-            Ok(pair) => pair,
-            Err(msg) => {
-                ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
-                    .await?;
-                return Ok(());
-            }
-        };
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id)
+    {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
+                .await?;
+            return Ok(());
+        }
+    };
 
     let target = match prompt_mutating_target(ctx, instances).await? {
         Some(t) => t,
@@ -438,15 +421,15 @@ pub async fn unban(
 ) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().map(|g| g.get());
-    let (_tenant, instances) =
-        match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
-            Ok(pair) => pair,
-            Err(msg) => {
-                ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
-                    .await?;
-                return Ok(());
-            }
-        };
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id)
+    {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
+                .await?;
+            return Ok(());
+        }
+    };
 
     let target = match prompt_mutating_target(ctx, instances).await? {
         Some(t) => t,
@@ -505,15 +488,15 @@ pub async fn unban(
 pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().map(|g| g.get());
-    let (_tenant, instances) =
-        match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
-            Ok(pair) => pair,
-            Err(msg) => {
-                ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
-                    .await?;
-                return Ok(());
-            }
-        };
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id)
+    {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.send(poise::CreateReply::default().content(msg).ephemeral(true))
+                .await?;
+            return Ok(());
+        }
+    };
 
     let target = match prompt_mutating_target(ctx, instances).await? {
         Some(t) => t,
@@ -525,10 +508,10 @@ pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
             ctx.defer().await?;
             match data.palworld_client.save(&instance).await {
                 Ok(()) => {
-                    ctx.send(poise::CreateReply::default().content(format!(
-                        "💾 World saved on **{}**!",
-                        instance.display_name
-                    )))
+                    ctx.send(
+                        poise::CreateReply::default()
+                            .content(format!("💾 World saved on **{}**!", instance.display_name)),
+                    )
                     .await?;
                 }
                 Err(e) => {
@@ -555,8 +538,10 @@ pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
                 results.push((instance.display_name.clone(), outcome));
             }
             ctx.send(
-                poise::CreateReply::default()
-                    .embed(build_multi_result_embed("💾 World Save — All Servers", results)),
+                poise::CreateReply::default().embed(build_multi_result_embed(
+                    "💾 World Save — All Servers",
+                    results,
+                )),
             )
             .await?;
         }

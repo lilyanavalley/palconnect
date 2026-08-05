@@ -1,18 +1,18 @@
-// 
+//
 // PalConnect - A Discord bot for PalWorld server monitoring
 // Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
 //
-// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
-// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
 // any later version.
 //
-// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
 // warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
 // details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 // <https://www.gnu.org/licenses/>.
-// 
+//
 
 //! Interactive Discord UI for selecting one or more PalWorld instances.
 //!
@@ -103,7 +103,10 @@ pub async fn prompt_mutating_target(
             .zip(inst_ids.iter())
             .map(|(inst, id)| serenity::CreateSelectMenuOption::new(&inst.display_name, id))
             .collect();
-        options.push(serenity::CreateSelectMenuOption::new("All Servers", &all_id));
+        options.push(serenity::CreateSelectMenuOption::new(
+            "All Servers",
+            &all_id,
+        ));
 
         let max = (instances.len() + 1).min(DISCORD_SELECT_MENU_MAX_OPTIONS) as u8;
         vec![serenity::CreateActionRow::SelectMenu(
@@ -211,10 +214,7 @@ pub async fn prompt_mutating_target(
                             ctx.serenity_context(),
                             serenity::CreateInteractionResponse::UpdateMessage(
                                 serenity::CreateInteractionResponseMessage::new()
-                                    .content(format!(
-                                        "▶️ Running on **{}**…",
-                                        names.join(", ")
-                                    ))
+                                    .content(format!("▶️ Running on **{}**…", names.join(", ")))
                                     .components(vec![]),
                             ),
                         )

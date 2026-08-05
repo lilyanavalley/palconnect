@@ -1,46 +1,44 @@
-// 
+//
 // PalConnect - A Discord bot for PalWorld server monitoring
 // Copyright (C) 2025  Lily Ana Valley <hi@lilyvalley.dev> <https://lilyvalley.dev>
 //
-// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General 
-// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) 
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option)
 // any later version.
 //
-// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied 
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
 // warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more
 // details.
-// 
+//
 // You should have received a copy of the GNU Affero General Public License along with this program.  If not, see
 // <https://www.gnu.org/licenses/>.
-// 
+//
 
 use poise::serenity_prelude::{self as serenity, CreateButton};
 
 use crate::commands::instance_selector::{
-    build_multi_result_embed, prompt_mutating_target, InstanceTarget,
+    InstanceTarget, build_multi_result_embed, prompt_mutating_target,
 };
 use crate::models::PalworldInstance;
 use crate::services::resolve_tenant_and_all_instances;
 use crate::{Context, Error};
 
-
 const PALWORLD_SYSTEMD_NAME: &str = "palworld.service";
 const PROMPT_TO_REBOOT: &str = "If you need to restart the server, please stop it first using `/stop` and then start it again using `/start`. (**Be careful, this will disconnect all players.**)";
-
 
 /// Start the server
 #[poise::command(slash_command)]
 pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().map(|g| g.get());
-    let (_tenant, instances) =
-        match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
-            Ok(pair) => pair,
-            Err(msg) => {
-                ctx.say(msg).await?;
-                return Ok(());
-            }
-        };
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id)
+    {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.say(msg).await?;
+            return Ok(());
+        }
+    };
 
     let target = match prompt_mutating_target(ctx, instances).await? {
         Some(t) => t,
@@ -82,10 +80,10 @@ async fn start_single(ctx: Context<'_>, instance: &PalworldInstance) -> Result<(
     }
 
     let outcome = start_instance(instance).await;
-    ctx.send(poise::CreateReply::default().content(format!(
-        "**{}**: {}",
-        instance.display_name, outcome
-    )))
+    ctx.send(
+        poise::CreateReply::default()
+            .content(format!("**{}**: {}", instance.display_name, outcome)),
+    )
     .await?;
     Ok(())
 }
@@ -106,10 +104,7 @@ async fn start_instance(instance: &PalworldInstance) -> String {
         .status();
 
     match process {
-        Ok(status) => format!(
-            "✅ Initiated (exit code: {})",
-            status.code().unwrap_or(-1)
-        ),
+        Ok(status) => format!("✅ Initiated (exit code: {})", status.code().unwrap_or(-1)),
         Err(e) => format!("❌ Failed to invoke systemctl: {}", e),
     }
 }
@@ -124,14 +119,14 @@ pub async fn stop(
 ) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().map(|g| g.get());
-    let (_tenant, instances) =
-        match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
-            Ok(pair) => pair,
-            Err(msg) => {
-                ctx.say(msg).await?;
-                return Ok(());
-            }
-        };
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id)
+    {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.say(msg).await?;
+            return Ok(());
+        }
+    };
 
     let target = match prompt_mutating_target(ctx, instances).await? {
         Some(t) => t,
@@ -145,12 +140,10 @@ pub async fn stop(
         InstanceTarget::Single(instance) => {
             ctx.defer().await?;
             if !data.palworld_client.check_online(&instance).await {
-                ctx.send(
-                    poise::CreateReply::default().content(format!(
-                        "⚠️ **{}** is already offline.",
-                        instance.display_name
-                    )),
-                )
+                ctx.send(poise::CreateReply::default().content(format!(
+                    "⚠️ **{}** is already offline.",
+                    instance.display_name
+                )))
                 .await?;
                 return Ok(());
             }
@@ -199,10 +192,7 @@ pub async fn stop(
                         .shutdown(instance, shutdown_time, &shutdown_message)
                         .await
                     {
-                        Ok(s) if s.is_success() => format!(
-                            "✅ Shutdown in {}s",
-                            shutdown_time
-                        ),
+                        Ok(s) if s.is_success() => format!("✅ Shutdown in {}s", shutdown_time),
                         Ok(s) => format!("❌ Rejected ({})", s),
                         Err(e) => format!("❌ {}", e),
                     }
@@ -225,14 +215,14 @@ pub async fn stop(
 pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
     let data = ctx.data();
     let guild_id = ctx.guild_id().map(|g| g.get());
-    let (_tenant, instances) =
-        match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id) {
-            Ok(pair) => pair,
-            Err(msg) => {
-                ctx.say(msg).await?;
-                return Ok(());
-            }
-        };
+    let (_tenant, instances) = match resolve_tenant_and_all_instances(&*data.tenant_store, guild_id)
+    {
+        Ok(pair) => pair,
+        Err(msg) => {
+            ctx.say(msg).await?;
+            return Ok(());
+        }
+    };
 
     if instances.len() == 1 {
         // Single instance: show the confirmation button as before.
@@ -307,8 +297,10 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
                         .collect()
                 };
 
-                let names: Vec<&str> =
-                    target_instances.iter().map(|i| i.display_name.as_str()).collect();
+                let names: Vec<&str> = target_instances
+                    .iter()
+                    .map(|i| i.display_name.as_str())
+                    .collect();
                 interaction
                     .create_response(
                         ctx.serenity_context(),
@@ -322,19 +314,16 @@ pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
 
                 let mut results = Vec::new();
                 for instance in &target_instances {
-                    let outcome =
-                        match data.palworld_client.force_stop(instance).await {
-                            Ok(status) => format!("✅ Force stopped ({})", status),
-                            Err(e) => format!("❌ {}", e),
-                        };
+                    let outcome = match data.palworld_client.force_stop(instance).await {
+                        Ok(status) => format!("✅ Force stopped ({})", status),
+                        Err(e) => format!("❌ {}", e),
+                    };
                     results.push((instance.display_name.clone(), outcome));
                 }
 
                 ctx.send(
-                    poise::CreateReply::default().embed(build_multi_result_embed(
-                        "🔥 Force Stop Results",
-                        results,
-                    )),
+                    poise::CreateReply::default()
+                        .embed(build_multi_result_embed("🔥 Force Stop Results", results)),
                 )
                 .await?;
             }
@@ -349,10 +338,10 @@ async fn force_stop_single(ctx: Context<'_>, instance: PalworldInstance) -> Resu
     let data = ctx.data();
 
     if !data.palworld_client.check_online(&instance).await {
-        ctx.send(
-            poise::CreateReply::default()
-                .content(format!("⚠️ **{}** is already offline.", instance.display_name)),
-        )
+        ctx.send(poise::CreateReply::default().content(format!(
+            "⚠️ **{}** is already offline.",
+            instance.display_name
+        )))
         .await?;
         return Ok(());
     }
@@ -390,10 +379,7 @@ async fn force_stop_single(ctx: Context<'_>, instance: PalworldInstance) -> Resu
                     ctx.serenity_context(),
                     serenity::CreateInteractionResponse::UpdateMessage(
                         serenity::CreateInteractionResponseMessage::default()
-                            .content(format!(
-                                "Force stopping **{}**…",
-                                instance.display_name
-                            ))
+                            .content(format!("Force stopping **{}**…", instance.display_name))
                             .components(vec![]),
                     ),
                 )

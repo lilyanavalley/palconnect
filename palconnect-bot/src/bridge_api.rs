@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use actix_web::{
-    get, post, put,
+    HttpRequest, HttpResponse, Responder, get, post, put,
     web::{Data, Json, Path},
-    HttpRequest, HttpResponse, Responder,
 };
 use log::warn;
 use palconnect_bridge::{
@@ -11,7 +10,7 @@ use palconnect_bridge::{
 };
 
 use crate::models::PalworldInstance;
-use crate::services::{InMemoryTenantStore, PalworldClient, TenantStore, DEFAULT_NEW_TENANT_NAME};
+use crate::services::{DEFAULT_NEW_TENANT_NAME, InMemoryTenantStore, PalworldClient, TenantStore};
 
 #[derive(Clone)]
 pub struct BridgeApiState {
@@ -22,9 +21,11 @@ pub struct BridgeApiState {
 
 fn require_bridge_token(req: &HttpRequest, state: &BridgeApiState) -> Result<(), HttpResponse> {
     let Some(expected_token) = state.bridge_api_token.as_deref() else {
-        return Err(HttpResponse::ServiceUnavailable().json(BridgeErrorResponse {
-            message: "bridge API token is not configured on the bot".to_string(),
-        }));
+        return Err(
+            HttpResponse::ServiceUnavailable().json(BridgeErrorResponse {
+                message: "bridge API token is not configured on the bot".to_string(),
+            }),
+        );
     };
 
     let provided_token = req
