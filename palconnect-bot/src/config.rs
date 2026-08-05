@@ -46,6 +46,9 @@ pub struct PalworldServerConfig {
     pub api_url: String,
     /// Admin password for HTTP Basic Auth.  Never logged or returned to chat.
     pub admin_password: String,
+    /// Optional local command used to update this dedicated server installation.
+    /// Defaults to the top-level `steamcmd_command` when omitted.
+    pub steamcmd_command: Option<String>,
 }
 
 // ─── Top-level Config ─────────────────────────────────────────────────────────
@@ -81,6 +84,12 @@ pub struct Config {
 
     // ── Optional bot settings ─────────────────────────────────────────────────
     pub enable_autoupdate:      Option<bool>,
+    pub steamdb_autoupdate_enabled: Option<bool>,
+    pub steamdb_rss_url:        Option<String>,
+    pub steamcmd_command:       Option<String>,
+    pub update_check_interval:  Option<u64>,
+    pub update_shutdown_delay:  Option<u64>,
+    pub update_shutdown_message: Option<String>,
     pub heartbeat_port:         Option<u16>,
     pub bridge_api_token:       Option<String>,
     /// How often (in seconds) the bot polls PalWorld servers and updates status.  Min 15.
@@ -95,6 +104,33 @@ impl Config {
 
     pub fn status_update_interval(&self) -> u64 {
         self.status_update_interval.unwrap_or(30)
+    }
+
+    pub fn steamdb_autoupdate_enabled(&self) -> bool {
+        self.steamdb_autoupdate_enabled.unwrap_or(false)
+    }
+
+    pub fn update_check_interval(&self) -> u64 {
+        self.update_check_interval.unwrap_or(300)
+    }
+
+    pub fn update_shutdown_delay(&self) -> u64 {
+        self.update_shutdown_delay.unwrap_or(60)
+    }
+
+    pub fn update_shutdown_message(&self) -> &str {
+        self.update_shutdown_message
+            .as_deref()
+            .filter(|message| !message.trim().is_empty())
+            .unwrap_or("Server update available; shutting down for maintenance.")
+    }
+
+    pub fn effective_steamcmd_command<'a>(&'a self, server: &'a PalworldServerConfig) -> Option<&'a str> {
+        server
+            .steamcmd_command
+            .as_deref()
+            .or(self.steamcmd_command.as_deref())
+            .filter(|command| !command.trim().is_empty())
     }
 
     pub fn multi_tenant(&self) -> bool {
@@ -130,6 +166,7 @@ impl Config {
             name: "PalWorld Server".to_string(),
             api_url: url,
             admin_password: password,
+            steamcmd_command: None,
         }]
     }
 }
@@ -144,6 +181,12 @@ impl Default for Config {
             palworld_api_url:           Some(String::from("http://localhost:8212/")),
             palworld_admin_password:    Some(String::new()),
             enable_autoupdate:          None,
+            steamdb_autoupdate_enabled: None,
+            steamdb_rss_url:            None,
+            steamcmd_command:           None,
+            update_check_interval:      None,
+            update_shutdown_delay:      None,
+            update_shutdown_message:    None,
             heartbeat_port:             None,
             bridge_api_token:           None,
             status_update_interval:     None,
@@ -238,6 +281,39 @@ pub fn setup() -> Config {
         );
     }
 
+    if let Ok(update_enable) = env::var("STEAMDB_AUTOUPDATE_ENABLED") {
+        config.steamdb_autoupdate_enabled = Some(
+            <bool as std::str::FromStr>::from_str(update_enable.to_lowercase().as_str())
+                .expect("Failed to parse STEAMDB_AUTOUPDATE_ENABLED as bool")
+        );
+    }
+
+    if let Ok(rss_url) = env::var("STEAMDB_RSS_URL") {
+        config.steamdb_rss_url = Some(rss_url);
+    }
+
+    if let Ok(command) = env::var("STEAMCMD_COMMAND") {
+        config.steamcmd_command = Some(command);
+    }
+
+    if let Ok(interval) = env::var("UPDATE_CHECK_INTERVAL") {
+        config.update_check_interval = Some(
+            interval.parse::<u64>()
+                .expect("Failed to parse UPDATE_CHECK_INTERVAL as u64")
+        );
+    }
+
+    if let Ok(delay) = env::var("UPDATE_SHUTDOWN_DELAY") {
+        config.update_shutdown_delay = Some(
+            delay.parse::<u64>()
+                .expect("Failed to parse UPDATE_SHUTDOWN_DELAY as u64")
+        );
+    }
+
+    if let Ok(message) = env::var("UPDATE_SHUTDOWN_MESSAGE") {
+        config.update_shutdown_message = Some(message);
+    }
+
     // If the no-autoupdate feature is enabled, disable autoupdate, even if the config or env var says otherwise.
     // This is a preventative measure for prebuilt packages that should not auto-update from within the app itself.
     #[cfg(feature = "no-autoupdate")]
@@ -256,4 +332,47 @@ pub fn setup() -> Config {
 
     config
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Config, PalworldServerConfig};
+
+    #[test]
+    fn effective_steamcmd_command_prefers_server_override() {
+        let config = Config {
+            steamcmd_command: Some("global command".into()),
+            ..Default::default()
+        };
+        let server = PalworldServerConfig {
+            name: "Main".into(),
+            api_url: "http://localhost:8212".into(),
+            admin_password: "secret".into(),
+            steamcmd_command: Some("server command".into()),
+        };
+
+        assert_eq!(
+            config.effective_steamcmd_command(&server),
+            Some("server command")
+        );
+    }
+
+    #[test]
+    fn effective_steamcmd_command_falls_back_to_global() {
+        let config = Config {
+            steamcmd_command: Some("global command".into()),
+            ..Default::default()
+        };
+        let server = PalworldServerConfig {
+            name: "Main".into(),
+            api_url: "http://localhost:8212".into(),
+            admin_password: "secret".into(),
+            steamcmd_command: None,
+        };
+
+        assert_eq!(
+            config.effective_steamcmd_command(&server),
+            Some("global command")
+        );
+    }
 }

@@ -22,3 +22,6 @@ pub use palworld_client::*;
 
 pub mod authz_guard;
 pub use authz_guard::*;
+
+pub mod steamdb_updater;
+pub use steamdb_updater::*;
