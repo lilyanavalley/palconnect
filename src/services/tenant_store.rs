@@ -179,7 +179,7 @@ impl InMemoryTenantStore {
             name: "Default".to_string(),
             enabled: true,
             invite_allowed,
-            status_channel_id: None,
+            status_channel_id: config.status_channel_id(),
             status_message_id: None,
         };
 

@@ -84,6 +84,10 @@ pub struct Config {
     pub heartbeat_port:         Option<u16>,
     /// How often (in seconds) the bot polls PalWorld servers and updates status.  Min 15.
     pub status_update_interval: Option<u64>,
+    /// Discord channel ID where the bot posts (and pins) a live server-status message.
+    /// When set, the background poller will keep this message up-to-date automatically.
+    /// Can also be configured at runtime with the `/set_status_channel` command.
+    pub status_channel_id:      Option<u64>,
     pub logging:                Option<Logging>,
 }
 
@@ -94,6 +98,10 @@ impl Config {
 
     pub fn status_update_interval(&self) -> u64 {
         self.status_update_interval.unwrap_or(30)
+    }
+
+    pub fn status_channel_id(&self) -> Option<u64> {
+        self.status_channel_id
     }
 
     pub fn multi_tenant(&self) -> bool {
@@ -139,6 +147,7 @@ impl Default for Config {
             enable_autoupdate:          None,
             heartbeat_port:             None,
             status_update_interval:     None,
+            status_channel_id:          None,
             logging:                    None,
         }
     }
@@ -240,6 +249,13 @@ pub fn setup() -> Config {
             panic!("STATUS_UPDATE_INTERVAL must be at least 15 seconds to avoid excessive API polling (got {}).", interval);
         }
         config.status_update_interval = Some(interval);
+    }
+
+    if let Ok(channel_id) = env::var("STATUS_CHANNEL_ID") {
+        config.status_channel_id = Some(
+            channel_id.parse::<u64>()
+                .expect("Failed to parse STATUS_CHANNEL_ID as u64"),
+        );
     }
 
     config

@@ -292,6 +292,8 @@ async fn start_services(
                 unban(),
                 save(),
                 update_status(),
+                set_status_channel(),
+                clear_status_channel(),
             ],
             event_handler: |ctx, event, _framework, data| {
                 Box::pin(on_event(ctx, event, data))

@@ -36,3 +36,6 @@ pub use admin_commands::*;
 
 pub mod test_status;
 pub use test_status::*;
+
+pub mod set_status_channel;
+pub use set_status_channel::*;
