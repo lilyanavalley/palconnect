@@ -1,21 +1,21 @@
 {
-  "version": "0.6.6",
+  "version": "0.7.1",
   "notes": "Latest release of PalConnect with updated features and bug fixes.",
-  "pub_date": "2026-07-10T13:28:41Z",
+  "pub_date": "2026-08-12T22:32:26Z",
   "platforms": {
     "linux-x86_64": {
-      "signature": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJR05oY21kdkxYQmhZMnRoWjJWeUlITmxZM0psZENCclpYa0tVbFZSZURCQlpXSnBSRFpSVUVkWGR6aHNWWGRMY1ZGcVZqaHpjR2x0YlhkU01uZ3hlbVIxYzBGTU1tWlZaVWN6UkdSbWEwdG1NelZyTkZaM1VUbGtZak5GZVhSSWExb3JORE5hVlRGTE1IcG5lRmhxV2xoelEyRlhWRTlUYVcxMlNHZDNQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94Tnpnek5qa3dNREEyQ1dacGJHVTZjR0ZzWTI5dWJtVmpkRjh3TGpZdU5sOWhiV1EyTkM1a1pXSUtkemxzTlRaMGRFTnRWMjExWkdKNldtaFBjMGxJVkZGVVZuUnVLeloxWm1Oek9VVnBPSEp3YVdRMloyUm9OU3MxVm5abFowMVhUVkJ2Y1RGb2NGbFVTaXR0Y2poMFRGQndXREpuVWxWWGRETm1ZVGxpUkhjOVBRbz0=",
-      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v0.6.6/palconnect-linux-x86_64.deb",
+      "signature": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJR05oY21kdkxYQmhZMnRoWjJWeUlITmxZM0psZENCclpYa0tVbFZSZURCQlpXSnBSRFpSVUVGdmJFOVVOMVJ6TmpOaVZXaElabFZGTUdwdlZuaEdWRlZFZFVGeU4wNWhZU3RzT0UxR1VtTm1SRkpFUVZSSmFXUjJUMnBYVkRnd1QwbEJNVWxhZDNBemNETXJRU3ROT0d4Vk9XaHZOVXM0T1c5bFdIZGpQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMk5UY3pORE00Q1dacGJHVTZjR0ZzWTI5dWJtVmpkRjh3TGpZdU5sOWhiV1EyTkM1a1pXSUtLMDFFTTA1emJtbDBPVkZuUm5GMlVFeE9RamROWVcxTWJua3JaRkJ6WkhKbmRVMDBWeXQzTDJKS1FtODJjamR2TDNaSlNGcDVSbFpxYjNSRmNtUklVM0Y0VVZKTFdHZFNSM3AyZVZOaVFYSndWbTFaUWtFOVBRbz0=",
+      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v0.7.1/palconnect-linux-x86_64.deb",
       "format": "deb"
     },
     "darwin-x86_64": {
-      "signature": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJR05oY21kdkxYQmhZMnRoWjJWeUlITmxZM0psZENCclpYa0tVbFZSZURCQlpXSnBSRFpSVUVsUWNrcFZVM3BYWTJkbFNXWkhSMVJMZURCa1IzUkpRelpySzJGT01qbHhiRk5vWm5KSlQzcHFTa1p3Y214TGRGRkhjbTU2UnpFeUsxcHhjbVY0ZWtsUVpuSnpiV0ZYTjBGUVIweE5SMlZ0VmpobmVsRTRQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94Tnpnek5qa3dNREk0Q1dacGJHVTZVR0ZzUTI5dWJtVmpkRjh3TGpZdU5sOWhZWEpqYURZMExtUnRad295WjNkYVZFbDJSM1ZsVVRjMlpsZGxVSHB6ZW1FMk9Vb3ZURUo2YmpsRmRXRTRlVEpIUkZsc2NqazBUaXRzT1U0MGVrb3laWE5MYUdoek1FMU1UVmRaZG5Vekx6QmFRa0UyVEZSelZsVmhaRkI2UWxaQ2R6MDlDZz09",
-      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v0.6.6/palconnect-macos-x86_64.dmg",
+      "signature": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJR05oY21kdkxYQmhZMnRoWjJWeUlITmxZM0psZENCclpYa0tVbFZSZURCQlpXSnBSRFpSVUVkdlJFcDNjMEZzYTJaNmMzVkViVFJSZGxrclpsSXhabUZFYmtobWVXaHBNbGRhY21kUGRqZFpMMjFNUVdRelMzTk5SWHBFUkU5bU9IRTNWVEZJYzFwNWREa3pOM0pJWjJjeE9FeFVTblZHWlhkRE9FRTBQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMk5UY3pOak15Q1dacGJHVTZVR0ZzUTI5dWJtVmpkRjh3TGpZdU5sOWhZWEpqYURZMExtUnRad3BwUm1aRVRFUlRSVUl5UW1zd1oyVXJORWh1ZVZGWldYWjVZMEpvVWxsNVNEUlNNbGhUTTJGRlFreFVabUpKTW5wVFpHUlVXbGxtVXpSREx6SlBaVmxpTTAwMFdIUklVVWt2ZFRCcWRWTkdkbk5tT1RoRFFUMDlDZz09",
+      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v0.7.1/palconnect-macos-x86_64.dmg",
       "format": "dmg"
     },
     "windows-x86_64": {
-      "signature": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJR05oY21kdkxYQmhZMnRoWjJWeUlITmxZM0psZENCclpYa0tVbFZSZURCQlpXSnBSRFpSVUVJclNHUmlSR05zZDA1UmIzVktlVkJwYWpCWlVWWk5PV2x0SzNoT01XRkxXblF3UlZSQ1RrWk5kRkF5YUVwM00zTm5WRGhuVmxaVFQyeDRRMnM1TTFnemFITlJiemR1UldJM1lWTXpXRnBzWmpsbFVGRlJQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94Tnpnek5qa3dNRGt3Q1dacGJHVTZjR0ZzWTI5dWJtVmpkRjh3TGpZdU5sOTROalJmWlc0dFZWTXViWE5wQ214R016QjNkMnhaUWpkd1FTdFdiVWhwTDBKR2JrTjZjemhTYXk5R1ZHTndjRTAxTDNkV1RUaDNlRGhWVTJ0V1IweG1WRmRyZGpBMmVXOXZZVlIyVlhsd2FHOXFTVVl3VkdNdlMweEpNRmhLWjJWWVFVRkJQVDBL",
-      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v0.6.6/palconnect-windows-x86_64.msi",
+      "signature": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUhOcFoyNWhkSFZ5WlNCbWNtOXRJR05oY21kdkxYQmhZMnRoWjJWeUlITmxZM0psZENCclpYa0tVbFZSZURCQlpXSnBSRFpSVUVaUmVVRlFVMlJtZEdKS05GcDJUVGhrY3psbVFsVnlRemRGTkVKTVYxbHdOMGx6Y0hodFFtZHhaM2xpTmpsbU0wbE5aRlZRTlRCcU1UUnZaemwzYlZoaU4wVTVTQ3RUZUdGaE1EVkRWVmxSZERFM1MyZDNQUXAwY25WemRHVmtJR052YlcxbGJuUTZJSFJwYldWemRHRnRjRG94TnpnMk5UY3pPRGs1Q1dacGJHVTZjR0ZzWTI5dWJtVmpkRjh3TGpZdU5sOTROalJmWlc0dFZWTXViWE5wQ25sWFJXaGtRakZ6ZW01RlRtbHZiemg2VURrM1RIUTBkeXMyVm5Ndk5XNXRNRXB2Y0RSbk5HZGxPVzAxUjFOa2FVbHhXSHBLYXpZMWRsbGlaR05SYVM5emNGZEpVRE56ZURRNFN6ZHdZVmR5Ym0xR1dVRjNQVDBL",
+      "url": "https://github.com/lilyanavalley/palconnect/releases/download/v0.7.1/palconnect-windows-x86_64.msi",
       "format": "wix"
     }
   }
