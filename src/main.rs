@@ -48,17 +48,17 @@
 use actix_web::{App, HttpServer};
 use cargo_packager_updater;
 use clap::Parser;
-use fern;
 #[cfg(unix)]
 use fork;
-use log::{debug, error, info, warn};
+use tracing::{ instrument, info, warn, error, debug, trace, trace_span };
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::EnvFilter;
 use poise::serenity_prelude as serenity;
 use reqwest::Client;
 use std::fs;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 #[cfg(unix)]
-use syslog;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
 
@@ -103,7 +103,7 @@ pub struct BotData {
 /// Forks the process into a background daemon, writes a PID file, runs the dispatcher,
 /// and cleans up the PID file on exit.
 #[cfg(unix)]
-async fn handle_daemon_mode() -> Result<(), Error> {
+async fn handle_daemon_mode(config: Config) -> Result<(), Error> {
     info!("👹 Starting in daemon mode...");
     match fork::daemon(false, false) {
         Ok(fork::Fork::Child) => {
@@ -116,7 +116,7 @@ async fn handle_daemon_mode() -> Result<(), Error> {
                 warn!("⚠️ Failed to write PID file: {}", e);
             }
 
-            let result = dispatcher().await;
+            let result = dispatcher(config).await;
 
             // Clean up PID file on exit
             if let Err(e) = remove_pid_file() {
@@ -137,45 +137,79 @@ async fn handle_daemon_mode() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    // * Initialize logging first thing (stdout and file on all platforms)
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{} [{}]: {}",
-                record.level(),
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                message
+fn main() -> Result<(), Error> {
+    // Initialize tracing sinks early so setup/config logs are captured.
+    let file_appender = tracing_appender::rolling::never(".", "log.txt");
+    let (file_writer, file_guard) = tracing_appender::non_blocking(file_appender);
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(false)
+                .with_writer(file_writer),
+        )
+        .with(sentry::integrations::tracing::layer())
+        .try_init()
+        .map_err(|e| format!("Failed to initialize tracing subscriber: {e}"))?;
+
+    let mut config: Config = Config::default();
+    trace_span!("config setup").in_scope(|| {
+        trace!("🔧 Setting up configuration...");
+        config = setup();
+    });
+
+    let mut _sentry_guard = None;
+    trace_span!("sentry setup").in_scope(|| {
+        _sentry_guard = if config.sentryio_enabled {
+            info!("📡 Telemetry enabled");
+            Some(sentry::init(
+                sentry::ClientOptions::new()
+                .dsn("https://f12475c389b17394817dd9cc7a1cb771@o246148.ingest.us.sentry.io/4511895563862016")
+                .maybe_release(sentry::release_name!())
+                .traces_sample_rate(0.5)
+                .auto_session_tracking(true)
+                .session_mode(sentry::SessionMode::Request)
+                .send_default_pii(false),
             ))
-        })
-        .level(log::LevelFilter::Info)
-        .chain(std::io::stdout())
-        .chain(fern::log_file("log.txt")?)
-        .apply()
-        .expect("Failed to initialize logging");
-
-    info!("🚀 PalConnect starting up...");
-    let args = Args::parse();
-
-    #[cfg(unix)]
-    {
-        info!("🐧 Unix platform detected");
-        if args.daemon {
-            return handle_daemon_mode().await;
         } else {
-            info!("🖥️ Running in foreground mode");
-        }
-    }
+            info!("📡❌ Telemetry disabled");
+            None
+        };
+    });
 
-    dispatcher().await
+    // Keep non-blocking file writer guard alive for the process lifetime.
+    let _file_guard = file_guard;
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+
+            info!("🚀 PalConnect starting up...");
+            let args = Args::parse();
+
+            #[cfg(unix)]
+            {
+                info!("🐧 Unix platform detected");
+                if args.daemon {
+                    return handle_daemon_mode(config).await;
+                } else {
+                    info!("🖥️ Running in foreground mode");
+                }
+            }
+
+            dispatcher(config).await
+
+        })
+
 }
 
-async fn dispatcher() -> Result<(), Error> {
+async fn dispatcher(config: Config) -> Result<(), Error> {
     info!("🔧 Starting main application dispatcher...");
     
-    let config = setup();
-
     // * Check for updates and apply if available
     check_and_install_updates(&config).await;
 
@@ -191,6 +225,7 @@ async fn dispatcher() -> Result<(), Error> {
 
 /// Checks for available updates and installs them if autoupdate is enabled.
 /// Uses cargo-packager-updater to check for new versions and install them.
+#[instrument(skip(config))]
 async fn check_and_install_updates(config: &Config) {
     if config.autoupdate() {
         info!("🔄 Autoupdate enabled, checking online for newer copy...");
@@ -243,7 +278,8 @@ async fn check_and_install_updates(config: &Config) {
 /// and runs the health check server. Handles graceful shutdown on Ctrl+C.
 async fn start_services(
     config: Config,
-    discord_token: String,
+    discord_token: String, // ? Why is this needed when config already contains the token?
+    // TODO: Consider refactoring to avoid passing the token separately if not necessary.
     heartbeat_port: u16,
 ) -> Result<(), Error> {
     // Create cancellation token and JoinHandle storage for graceful shutdown

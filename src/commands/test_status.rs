@@ -14,10 +14,12 @@
 // <https://www.gnu.org/licenses/>.
 // 
 
+use tracing::{ instrument, info, warn, error, debug, trace, trace_span };
 use crate::{Context, Error};
 use crate::glance::update_status_now;
 
 /// Manually trigger a bot status update (useful for testing)
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn update_status(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;

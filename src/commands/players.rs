@@ -16,6 +16,7 @@
 
 use poise::serenity_prelude as serenity;
 use serde::Deserialize;
+use tracing::{ instrument, info, warn, error, debug, trace, trace_span };
 
 use crate::{Context, Error};
 
@@ -40,6 +41,7 @@ struct Player {
 }
 
 /// Show current player count on the PalWorld server
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn players(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;

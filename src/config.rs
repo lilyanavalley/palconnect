@@ -19,7 +19,7 @@ use std::io::Read;
 use std::env;
 use toml;
 use serde::Deserialize;
-use log::{ trace, debug, info, warn, error };
+use tracing::{ instrument, info, warn, error, debug, trace, trace_span };
 
 
 const CONFIG_LOCATIONS: [&str; 3] = [
@@ -38,6 +38,7 @@ pub struct Config {
     pub heartbeat_port:             Option<u16>,
     pub status_update_interval:     Option<u64>,        // * Status update interval in seconds
     pub logging:                    Option<Logging>,
+    pub sentryio_enabled:           bool
 }
 
 impl Config {
@@ -60,6 +61,7 @@ impl Default for Config {
             heartbeat_port:             None,
             status_update_interval:     None,
             logging:                    None,
+            sentryio_enabled:           false,
         }
     }
 }
@@ -72,6 +74,7 @@ pub struct Logging {
     pub use_file_path: Option<String>,
 }
 
+#[instrument]
 pub fn setup() -> Config {
     
     let mut config_buffer = Vec::new();
@@ -143,6 +146,11 @@ pub fn setup() -> Config {
             panic!("STATUS_UPDATE_INTERVAL must be at least 15 seconds to avoid excessive API polling (got {}).", interval);
         }
         config.status_update_interval = Some(interval);
+    }
+
+    if let Ok(sentryio_enabled) = env::var("SENTRYIO_ENABLE") {
+        config.sentryio_enabled = sentryio_enabled.parse::<bool>()
+            .expect("Failed to parse SENTRYIO_ENABLE as bool");
     }
 
     config

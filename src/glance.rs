@@ -14,7 +14,7 @@
 // <https://www.gnu.org/licenses/>.
 // 
 
-use log::{debug, error, info, warn};
+use tracing::{ instrument, info, warn, error, debug, trace, trace_span };
 use poise::serenity_prelude as serenity;
 use reqwest::Client;
 use serde::Deserialize;
@@ -85,6 +85,7 @@ pub async fn start_status_updater(
 }
 
 /// Update the bot's status with current server information
+#[instrument(skip(ctx, bot_data))]
 async fn update_bot_status(
     ctx: &serenity::Context,
     bot_data: &BotData,
@@ -120,6 +121,7 @@ async fn update_bot_status(
 }
 
 /// Get current player count from the PalWorld server
+#[instrument(skip(http_client, palworld_api_url, admin_password))]
 async fn get_player_count(
     http_client: &Client,
     palworld_api_url: &str,
@@ -140,6 +142,7 @@ async fn get_player_count(
 }
 
 /// Get server information from the PalWorld server
+#[instrument(skip(http_client, palworld_api_url, admin_password))]
 async fn get_server_info(
     http_client: &Client,
     palworld_api_url: &str,
@@ -159,6 +162,7 @@ async fn get_server_info(
 }
 
 /// Manually trigger a status update (useful for testing or immediate updates)
+#[instrument(skip(ctx, bot_data))]
 pub async fn update_status_now(
     ctx: &serenity::Context,
     bot_data: &BotData,
