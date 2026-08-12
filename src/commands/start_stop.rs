@@ -15,7 +15,7 @@
 // 
 
 use poise::serenity_prelude::{self as serenity, CreateButton};
-
+use tracing::{ instrument, info, warn, error, debug, trace, trace_span };
 use crate::{Context, Error};
 
 
@@ -24,6 +24,7 @@ const PROMPT_TO_REBOOT: &str = "If you need to restart the server, please stop i
 
 
 /// Start the server
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
 
@@ -63,6 +64,7 @@ pub async fn start(ctx: Context<'_>) -> Result<(), Error> {
 
 // TODO: Take shortened arguments for time (-t) and message (-m).
 /// Stop the server. May take 2 arguments: --time <seconds> / --message <custom shutdown message>
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn stop(
     ctx: Context<'_>,
@@ -122,6 +124,7 @@ pub async fn stop(
 }
 
 /// Force stop the server
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn forcestop(ctx: Context<'_>) -> Result<(), Error> {
 

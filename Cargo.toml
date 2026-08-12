@@ -17,9 +17,12 @@ cargo-packager = { version = "0.11.7", default-features = false }
 cargo-packager-updater = "0.2.3"
 actix-web = "4.11"
 chrono = "0.4.42"
-log = "0.4.28"
-fern = "0.7"
+tracing = "0.1.44"
+tracing-log = "0.2"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 clap = { version = "4.0", features = ["derive"] }
+sentry = { version = "0.49.1", features = ["tracing"] }
 
 [target.'cfg(unix)'.dependencies]
 syslog = "7.0.0"

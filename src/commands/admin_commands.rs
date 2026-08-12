@@ -16,6 +16,7 @@
 
 use poise::serenity_prelude as serenity;
 use serde::Deserialize;
+use tracing::{ instrument, info, warn, error, debug, trace, trace_span };
 
 use crate::{Context, Error};
 
@@ -33,6 +34,7 @@ struct MetricsResponse {
 }
 
 /// Print PalWorld server settings
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
@@ -104,6 +106,7 @@ pub async fn settings(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Print PalWorld server metrics
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn metrics(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
@@ -176,6 +179,7 @@ pub async fn metrics(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 /// Announce a message to all players
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn announce(
     ctx: Context<'_>,
@@ -227,6 +231,7 @@ pub async fn announce(
 }
 
 /// Kick a player from the server
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn kick(
     ctx: Context<'_>,
@@ -287,6 +292,7 @@ pub async fn kick(
 }
 
 /// Ban a player from the server
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn ban(
     ctx: Context<'_>,
@@ -347,6 +353,7 @@ pub async fn ban(
 }
 
 /// Unban a previously banned player
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn unban(
     ctx: Context<'_>,
@@ -399,6 +406,7 @@ pub async fn unban(
 
 /// Save the world
 #[poise::command(slash_command)]
+#[instrument(skip(ctx))]
 pub async fn save(ctx: Context<'_>) -> Result<(), Error> {
     ctx.defer().await?;
 
@@ -451,8 +459,9 @@ const SENSITIVE_FIELDS: &[&str] = &[
 ];
 
 /// Recursively sanitize sensitive data from JSON values
-fn sanitize_sensitive_data(mut jsonKP: serde_json::Value) -> serde_json::Value {
-    match &mut jsonKP {
+#[instrument(skip(json_kp))]
+fn sanitize_sensitive_data(mut json_kp: serde_json::Value) -> serde_json::Value {
+    match &mut json_kp {
         serde_json::Value::Object(map) => {
             // List of sensitive field names to redact
             for (key, value) in map.iter_mut() {
@@ -487,5 +496,5 @@ fn sanitize_sensitive_data(mut jsonKP: serde_json::Value) -> serde_json::Value {
         }
         _ => {} // Primitives don't need sanitization
     }
-    jsonKP
+    json_kp
 }

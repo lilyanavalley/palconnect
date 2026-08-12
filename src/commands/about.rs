@@ -15,11 +15,13 @@
 // 
 
 use poise::serenity_prelude as serenity;
+use tracing::{ instrument, info, warn, error, debug, trace, trace_span };
 
 use crate::{Context, Error};
 
 
 /// Show help information
+#[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn about(ctx: Context<'_>) -> Result<(), Error> {
     let embed = serenity::CreateEmbed::new()
