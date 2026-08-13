@@ -79,6 +79,15 @@ AdminPassword=your_secure_admin_password_here
    
    **Note**: Use the same password you set as `AdminPassword` in your PalWorld server config.
 
+   #### Telemetry
+   
+   📡 If desired, you can enable diagnostic telemetry.
+   
+   **Telemetry is disabled by default** unless and until you specify this environment variable:
+   `SENTRYIO_ENABLE=true`
+
+   The authors of PalConnect implement [sentry.io](https://sentry.io) to record and analyze telemetry data for the sole purpose of improving PalConnect. Such data is neither shared nor sold to 3rd parties and is anonymized wherever possible. Sentry publishes a [Security, Privacy and Compliance statement](https://sentry.io/security) for you to read. Enabling or disabling telemetry does not affect your or your user’s feature set of PalConnect.
+   
 ### 5. Running the Bot
 
 1. Install dependencies and run:
