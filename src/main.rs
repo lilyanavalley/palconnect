@@ -96,6 +96,7 @@ pub struct BotData {
     http_client: Client,
     palworld_api_url: String,
     admin_password: String,
+    is_telemetry_enabled: bool,
 }
 
 /// Handles the daemonization process on Unix platforms.
@@ -320,6 +321,7 @@ async fn start_services(
                     http_client: Client::new(),
                     palworld_api_url,
                     admin_password,
+                    is_telemetry_enabled: config.sentryio_enabled,
                 };
                 
                 // Start the status updater background task with Arc-wrapped data

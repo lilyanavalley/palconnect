@@ -24,6 +24,11 @@ use crate::{Context, Error};
 #[instrument(skip(ctx))]
 #[poise::command(slash_command)]
 pub async fn about(ctx: Context<'_>) -> Result<(), Error> {
+    let telemetry_status = if ctx.data().is_telemetry_enabled {
+        "📡 Enabled"
+    } else {
+        "📡❌ Disabled"
+    };
     let embed = serenity::CreateEmbed::new()
         .title("ℹ️ About PalConnect")
         .description("PalConnect is a Discord bot for monitoring your PalWorld dedicated server and integrating server management commands into Discord.")
@@ -31,6 +36,7 @@ pub async fn about(ctx: Context<'_>) -> Result<(), Error> {
         .field("Author", "Lily Ana Valley — <hi@lilyvalley.dev>", false)
         .field("License", "GNU Affero General Public License v3.0 (AGPLv3) https://www.gnu.org/licenses/agpl-3.0.en.html", false)
         .field("Source Code", "https://github.com/lilyanavalley/palconnect", false)
+        .field("Telemetry", telemetry_status, false)
         .color(0x7289da);
 
     ctx.send(poise::CreateReply::default().embed(embed)).await?;
