@@ -79,7 +79,23 @@ AdminPassword=your_secure_admin_password_here
    
    **Note**: Use the same password you set as `AdminPassword` in your PalWorld server config.
 
-### 5. Running the Bot
+### 5. Considering Telemetry... (**optional**)
+
+📡 If desired, you can enable diagnostic telemetry. **Telemetry is disabled by default**. 
+
+You can enable telemetry by specifying this environment variable:
+`SENTRYIO_ENABLE=true`. Enabling or disabling telemetry doesn't change the user-facing features of PalConnect... it's only used by the authors to improve upon PalConnect.
+
+The authors of PalConnect implement [sentry.io](https://sentry.io) as a telemetry platform to record and analyze telemetry data for the sole purpose of improving PalConnect. Such data is neither shared nor sold to 3rd parties and is anonymized wherever possible. Sentry publishes a [Security, Privacy and Compliance statement](https://sentry.io/security) for you to read.
+
+In particular, the following data is captured as part of telemetry:
+
+- crash-time [backtraces](https://en.wikipedia.org/wiki/Stack_trace), [panic](https://en.wikipedia.org/wiki/Stack_trace#Rust) reports
+- logs (with sensitive/PII data redacted)
+- system context: naming your host OS, machine make/model, and Rust (language) version
+- metadata about the loaded [shared libraries](https://en.wikipedia.org/wiki/Shared_library) used by this app (`libc`, for example)
+
+### 6. Running the Bot
 
 1. Install dependencies and run:
    ```bash
