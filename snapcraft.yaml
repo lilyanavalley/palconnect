@@ -32,7 +32,7 @@ parts:
       "COPYING.md": /usr/src/palconnect/COPYING.md
       ".env.example": /usr/src/palconnect/.env.example
     stage:
-      - usr/
+      - /usr/
     build-packages:
       - pkg-config
       - build-essential

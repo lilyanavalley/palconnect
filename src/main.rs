@@ -58,7 +58,6 @@ use reqwest::Client;
 use std::fs;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
-#[cfg(unix)]
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
 
