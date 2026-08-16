@@ -85,7 +85,7 @@ pub async fn players(ctx: Context<'_>) -> Result<(), Error> {
                             .players
                             .iter()
                             .map(|p| format!(
-                                "{name} \n |---- 🌐 Account: {account} | 🆔 Player: {player_id} \n |---- 🯊 Level: {level} | 🏛 Buildings: {building_count}\n |---- 📍 Location: ({location_x}, {location_y}) | 📶 Ping: {ping}ms\n",
+                                "{name} \n |---- 🌐 Account: {account} | 🆔 Player: {player_id} \n |---- 🯊 Level: {level} | 🏛 Buildings: {building_count} \n |---- 📍 Location: ({location_x}, {location_y}) | 📶 Ping: {ping}ms \n",
                                 name = p.name,
                                 account = p.account_name,
                                 player_id = p.player_id,
