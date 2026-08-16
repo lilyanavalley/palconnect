@@ -28,16 +28,32 @@ struct PlayersResponse {
 
 #[derive(Debug, Deserialize)]
 struct Player {
+
     name: String,
+
+    // * Added post-v1 Palworld update
+    #[serde(rename = "accountName")]
+    account_name: String,
+    
     #[serde(rename = "playerId")]
     player_id: String,
+    
     #[serde(rename = "userId")]
     user_id: String,
-    ip: String,
+    
+    ip: String, // * Currently unused
+    
     ping: f64,
+    
     location_x: f64,
+    
     location_y: f64,
+    
     level: u32,
+
+    // * Added post-v1 Palworld update
+    building_count: u32,
+
 }
 
 /// Show current player count on the PalWorld server
@@ -58,16 +74,30 @@ pub async fn players(ctx: Context<'_>) -> Result<(), Error> {
     {
         Ok(response) => match response.json::<PlayersResponse>().await {
             Ok(players_data) => {
+                debug!("Received /players response, vector length: {}", players_data.players.len());
                 let player_count = players_data.players.len();
                 let player_list = if players_data.players.is_empty() {
                     "No players currently online".to_string()
                 } else {
-                    players_data
-                        .players
-                        .iter()
-                        .map(|p| format!("• {} (Level {})", p.name, p.level))
-                        .collect::<Vec<String>>()
-                        .join("\n")
+                    trace_span!("Formatting player list").in_scope(|| {
+                        debug!("Formatting player list for {} players", player_count);
+                        players_data
+                            .players
+                            .iter()
+                            .map(|p| format!(
+                                "{name} \n |---- 🌐 Account: {account} | 🆔 Player: {player_id} \n |---- 🯊 Level: {level} | 🏛 Buildings: {building_count} \n |---- 📍 Location: ({location_x}, {location_y}) | 📶 Ping: {ping}ms \n",
+                                name = p.name,
+                                account = p.account_name,
+                                player_id = p.player_id,
+                                level = p.level,
+                                building_count = p.building_count,
+                                location_x = p.location_x,
+                                location_y = p.location_y,
+                                ping = p.ping
+                            ))
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    })
                 };
 
                 let embed = serenity::CreateEmbed::new()
@@ -80,6 +110,7 @@ pub async fn players(ctx: Context<'_>) -> Result<(), Error> {
                 ctx.send(poise::CreateReply::default().embed(embed)).await?;
             }
             Err(e) => {
+                error!("Failed to parse server response: {}", e);
                 ctx.send(
                     poise::CreateReply::default()
                         .content(format!("❌ Failed to parse server response: {}", e))
