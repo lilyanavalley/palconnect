@@ -7,32 +7,68 @@ license.workspace = true
 
 [features]
 default = ["ssr"]
-ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr"]
-hydrate = ["leptos/hydrate"]
+ssr = [
+    "dep:actix-files",
+	"dep:actix-web",
+	"dep:leptos_actix",
+	"dep:reqwest",
+	"dep:surrealdb",
+	"leptos/ssr",
+	"leptos_meta/ssr",
+	"leptos_router/ssr",
+]
+hydrate = [
+    "dep:console_error_panic_hook",
+    "dep:wasm-bindgen",
+    "leptos/hydrate"
+]
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 'z'
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "palconnect-web"
+path = "src/main.rs"
+required-features = ["ssr"]
+
 [dependencies]
-actix-web.workspace = true
+actix-files = { version = "0.6", optional = true }
+actix-web = { workspace = true, optional = true }
 leptos.workspace = true
-leptos_actix.workspace = true
+leptos_actix = { workspace = true, optional = true }
 leptos_meta.workspace = true
 leptos_router.workspace = true
 palconnect-bridge = { path = "../palconnect-bridge" }
-reqwest.workspace = true
+toml.workspace = true
+dotenv.workspace = true
+reqwest = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
-tokio.workspace = true
+console_error_panic_hook = { version = "0.1.7", optional = true }
+wasm-bindgen = { version = "0.2.126", optional = true }
+icondata = { version = "0.7.0", default-features = false, features = ["bootstrap-icons", "material-design-icons", "remix-icon"] }
+leptos_icons = "0.7.1"
+surrealdb = { version = "3.2.3", optional = true }
+openidconnect = "4.0.1"
+
 
 [package.metadata.leptos]
-site-root = "target/site"
+site-root = "site"
 site-pkg-dir = "pkg"
 site-addr = "127.0.0.1:3000"
+assets-dir = "assets"
 reload-port = 3001
 browserquery = "defaults"
 env = "DEV"
+tailwind-input-file = "tailwind.css"
 bin-features = ["ssr"]
 lib-features = ["hydrate"]
 bin-default-features = false
 lib-default-features = false
+end2end-cmd = "npx playwright test"
+end2end-dir = "end2end"

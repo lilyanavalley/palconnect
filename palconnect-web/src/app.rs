@@ -5,14 +5,16 @@ use leptos::{
 };
 use leptos_meta::*;
 use leptos_router::{
-    components::{FlatRoutes, Route, Router},
     StaticSegment,
+    components::{FlatRoutes, Route, Router},
 };
 use palconnect_bridge::{
     BridgeErrorResponse, ConnectionTestRequest, ConnectionTestResponse, RolePolicyConfig,
     TenantAdminState,
 };
 use serde::de::DeserializeOwned;
+
+use crate::{components::*, views::*};
 
 fn apply_loaded_state(
     set_tenant_id: WriteSignal<u64>,
@@ -29,9 +31,8 @@ fn apply_loaded_state(
     set_tenant_name.set(state.tenant_name);
     set_enabled.set(state.enabled);
     set_invite_allowed.set(state.invite_allowed);
-    set_instances_json.set(
-        serde_json::to_string_pretty(&state.instances).unwrap_or_else(|_| "[]".to_string()),
-    );
+    set_instances_json
+        .set(serde_json::to_string_pretty(&state.instances).unwrap_or_else(|_| "[]".to_string()));
     set_role_policies_json.set(
         serde_json::to_string_pretty(&state.role_policies).unwrap_or_else(|_| "[]".to_string()),
     );
@@ -41,16 +42,21 @@ fn apply_loaded_state(
 pub fn App() -> impl IntoView {
     provide_meta_context();
 
+    // * The root component of our app is the <App/> component, which includes the drawer and router setup.
     view! {
-        <Stylesheet id="leptos" href="/pkg/palconnect-web.css" />
-        <Title text="PalConnect Admin Console" />
+      <Title text="PalConnect Admin Console" />
+      <Drawer>
         <Router>
-            <FlatRoutes fallback=|| "Page not found.">
-                <Route path=StaticSegment("") view=AdminConsolePage />
-            </FlatRoutes>
+          <FlatRoutes fallback=|| "Page not found.">
+            <Route path=StaticSegment("") view=Console />
+            <Route path=StaticSegment("credits") view=Credits />
+          </FlatRoutes>
         </Router>
+      </Drawer>
     }
 }
+
+// * The below code was committed by AI Assistant, and is intended to be a starting point for the admin console page. It is not yet integrated into the app, but it can be used as a reference for building out the admin console functionality.
 
 #[component]
 fn AdminConsolePage() -> impl IntoView {
@@ -72,205 +78,205 @@ fn AdminConsolePage() -> impl IntoView {
     let (connection_status, set_connection_status) = signal(String::new());
 
     view! {
-        <main class="palconnect-admin">
-            <section>
-                <h1>"PalConnect multi-tenant admin console"</h1>
-                <p>
-                    "Load a Discord guild, edit its PalWorld server connections and role policies, and save the updated state back through the bot bridge API."
-                </p>
-            </section>
+      <main class="palconnect-admin w-full h-full overflow-auto">
+        <section>
+          <h1>"PalConnect multi-tenant admin console"</h1>
+          <p>
+            "Load a Discord guild, edit its PalWorld server connections and role policies, and save the updated state back through the bot bridge API."
+          </p>
+        </section>
 
-            <section>
-                <label for="guild-id"><strong>"Discord guild ID"</strong></label>
-                <div class="row">
-                    <input id="guild-id" node_ref=guild_id_ref prop:value=move || guild_id.get() on:input=move |ev| set_guild_id.set(event_target_value(&ev)) />
-                    <button on:click=move |_| {
-                        let Some(input) = guild_id_ref.get() else {
-                            set_status.set("Guild ID input is unavailable.".to_string());
-                            return;
-                        };
-                        let raw_guild_id = input.value();
-                        let Ok(parsed_guild_id) = raw_guild_id.parse::<u64>() else {
-                            set_status.set("Enter a numeric Discord guild ID.".to_string());
-                            return;
-                        };
-                        set_status.set("Loading guild state…".to_string());
-                        let set_status = set_status;
-                        let set_guild_id = set_guild_id;
-                        let set_tenant_name = set_tenant_name;
-                        let set_enabled = set_enabled;
-                        let set_invite_allowed = set_invite_allowed;
-                        let set_instances_json = set_instances_json;
-                        let set_role_policies_json = set_role_policies_json;
-                        spawn_local(async move {
-                            match load_guild_state(parsed_guild_id).await {
-                                Ok(state) => {
-                                    apply_loaded_state(
-                                        set_tenant_id,
-                                        set_guild_id,
-                                        set_tenant_name,
-                                        set_enabled,
-                                        set_invite_allowed,
-                                        set_instances_json,
-                                        set_role_policies_json,
-                                        state,
-                                    );
-                                    set_status.set("Guild state loaded from the bot.".to_string());
-                                }
-                                Err(err) => {
-                                    set_status.set(format!("Failed to load guild state: {}", err));
-                                }
-                            }
-                        });
-                    }>"Load guild"</button>
-                </div>
-            </section>
+        <section>
+          <label for="guild-id"><strong>"Discord guild ID"</strong></label>
+          <div class="row">
+            <input id="guild-id" node_ref=guild_id_ref prop:value=move || guild_id.get() on:input=move |ev| set_guild_id.set(event_target_value(&ev)) />
+            <button on:click=move |_| {
+                let Some(input) = guild_id_ref.get() else {
+                    set_status.set("Guild ID input is unavailable.".to_string());
+                    return;
+                };
+                let raw_guild_id = input.value();
+                let Ok(parsed_guild_id) = raw_guild_id.parse::<u64>() else {
+                    set_status.set("Enter a numeric Discord guild ID.".to_string());
+                    return;
+                };
+                set_status.set("Loading guild state…".to_string());
+                let set_status = set_status;
+                let set_guild_id = set_guild_id;
+                let set_tenant_name = set_tenant_name;
+                let set_enabled = set_enabled;
+                let set_invite_allowed = set_invite_allowed;
+                let set_instances_json = set_instances_json;
+                let set_role_policies_json = set_role_policies_json;
+                spawn_local(async move {
+                  match load_guild_state(parsed_guild_id).await {
+                    Ok(state) => {
+                      apply_loaded_state(
+                        set_tenant_id,
+                        set_guild_id,
+                        set_tenant_name,
+                        set_enabled,
+                        set_invite_allowed,
+                        set_instances_json,
+                        set_role_policies_json,
+                        state,
+                      );
+                      set_status.set("Guild state loaded from the bot.".to_string());
+                    }
+                    Err(err) => {
+                      set_status.set(format!("Failed to load guild state: {}", err));
+                    }
+                  }
+                });
+              }>"Load guild"</button>
+          </div>
+        </section>
 
-            <section>
-                <h2>"Tenant settings"</h2>
-                <label for="tenant-name">"Display name"</label>
-                <input
-                    id="tenant-name"
-                    node_ref=tenant_name_ref
-                    prop:value=move || tenant_name.get()
-                    on:input=move |ev| set_tenant_name.set(event_target_value(&ev))
-                />
-                <div class="row">
-                    <label>
-                        <input
-                            type="checkbox"
-                            prop:checked=move || enabled.get()
-                            on:change=move |ev| set_enabled.set(event_target_checked(&ev))
-                        />
-                        "Tenant enabled"
-                    </label>
-                    <label>
-                        <input
-                            type="checkbox"
-                            prop:checked=move || invite_allowed.get()
-                            on:change=move |ev| set_invite_allowed.set(event_target_checked(&ev))
-                        />
-                        "Allow guild invites"
-                    </label>
-                </div>
-            </section>
+        <section>
+          <h2>"Tenant settings"</h2>
+          <label for="tenant-name">"Display name"</label>
+          <input
+            id="tenant-name"
+            node_ref=tenant_name_ref
+            prop:value=move || tenant_name.get()
+            on:input=move |ev| set_tenant_name.set(event_target_value(&ev))
+          />
+          <div class="row">
+            <label>
+              <input
+                type="checkbox"
+                prop:checked=move || enabled.get()
+                on:change=move |ev| set_enabled.set(event_target_checked(&ev))
+              />
+              "Tenant enabled"
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                prop:checked=move || invite_allowed.get()
+                on:change=move |ev| set_invite_allowed.set(event_target_checked(&ev))
+              />
+              "Allow guild invites"
+            </label>
+          </div>
+        </section>
 
-            <section>
-                <h2>"PalWorld server connections"</h2>
-                <p>"Edit the JSON array directly. New items can omit an `id`; the bot will assign one."</p>
-                <textarea
-                    node_ref=instances_ref
-                    prop:value=move || instances_json.get()
-                    on:input=move |ev| set_instances_json.set(event_target_value(&ev))
-                    rows="14"
-                />
-            </section>
+        <section>
+          <h2>"PalWorld server connections"</h2>
+          <p>"Edit the JSON array directly. New items can omit an `id`; the bot will assign one."</p>
+          <textarea
+            node_ref=instances_ref
+            prop:value=move || instances_json.get()
+            on:input=move |ev| set_instances_json.set(event_target_value(&ev))
+            rows="14"
+          />
+        </section>
 
-            <section>
-                <h2>"Discord role policies"</h2>
-                <p>
-                    "Policies can target a single PalWorld instance by ID or all instances by setting `palworld_instance_id` to null."
-                </p>
-                <textarea
-                    node_ref=role_policies_ref
-                    prop:value=move || role_policies_json.get()
-                    on:input=move |ev| set_role_policies_json.set(event_target_value(&ev))
-                    rows="14"
-                />
-            </section>
+        <section>
+          <h2>"Discord role policies"</h2>
+          <p>
+            "Policies can target a single PalWorld instance by ID or all instances by setting `palworld_instance_id` to null."
+          </p>
+          <textarea
+            node_ref=role_policies_ref
+            prop:value=move || role_policies_json.get()
+            on:input=move |ev| set_role_policies_json.set(event_target_value(&ev))
+            rows="14"
+          />
+        </section>
 
-            <section>
-                <div class="row">
-                    <button on:click=move |_| {
-                        let Ok(parsed_guild_id) = guild_id.get().parse::<u64>() else {
-                            set_status.set("Load a numeric guild ID before saving.".to_string());
-                            return;
-                        };
-                        let tenant_id = tenant_id.get();
-                        let tenant_name = tenant_name.get();
-                        let enabled = enabled.get();
-                        let invite_allowed = invite_allowed.get();
-                        let instances_json = instances_json.get();
-                        let role_policies_json = role_policies_json.get();
-                        set_status.set("Saving guild state through the bot bridge…".to_string());
-                        let set_status = set_status;
-                        let set_guild_id = set_guild_id;
-                        let set_tenant_name = set_tenant_name;
-                        let set_enabled = set_enabled;
-                        let set_invite_allowed = set_invite_allowed;
-                        let set_instances_json = set_instances_json;
-                        let set_role_policies_json = set_role_policies_json;
-                        spawn_local(async move {
-                            match save_guild_state(
-                                parsed_guild_id,
-                                tenant_id,
-                                tenant_name,
-                                enabled,
-                                invite_allowed,
-                                instances_json,
-                                role_policies_json,
-                            )
-                            .await
-                            {
-                                Ok(state) => {
-                                    apply_loaded_state(
-                                        set_tenant_id,
-                                        set_guild_id,
-                                        set_tenant_name,
-                                        set_enabled,
-                                        set_invite_allowed,
-                                        set_instances_json,
-                                        set_role_policies_json,
-                                        state,
-                                    );
-                                    set_status.set("Guild state saved through the bot.".to_string());
-                                }
-                                Err(err) => {
-                                    set_status.set(format!("Failed to save guild state: {}", err));
-                                }
-                            }
-                        });
-                    }>"Save guild state"</button>
-                    <span>{move || status.get()}</span>
-                </div>
-            </section>
+        <section>
+          <div class="row">
+              <button on:click=move |_| {
+                let Ok(parsed_guild_id) = guild_id.get().parse::<u64>() else {
+                  set_status.set("Load a numeric guild ID before saving.".to_string());
+                  return;
+                };
+                let tenant_id = tenant_id.get();
+                let tenant_name = tenant_name.get();
+                let enabled = enabled.get();
+                let invite_allowed = invite_allowed.get();
+                let instances_json = instances_json.get();
+                let role_policies_json = role_policies_json.get();
+                set_status.set("Saving guild state through the bot bridge…".to_string());
+                let set_status = set_status;
+                let set_guild_id = set_guild_id;
+                let set_tenant_name = set_tenant_name;
+                let set_enabled = set_enabled;
+                let set_invite_allowed = set_invite_allowed;
+                let set_instances_json = set_instances_json;
+                let set_role_policies_json = set_role_policies_json;
+                spawn_local(async move {
+                  match save_guild_state(
+                    parsed_guild_id,
+                    tenant_id,
+                    tenant_name,
+                    enabled,
+                    invite_allowed,
+                    instances_json,
+                    role_policies_json,
+                  )
+                  .await
+                  {
+                    Ok(state) => {
+                      apply_loaded_state(
+                        set_tenant_id,
+                        set_guild_id,
+                        set_tenant_name,
+                        set_enabled,
+                        set_invite_allowed,
+                        set_instances_json,
+                        set_role_policies_json,
+                        state,
+                      );
+                      set_status.set("Guild state saved through the bot.".to_string());
+                    }
+                    Err(err) => {
+                      set_status.set(format!("Failed to save guild state: {}", err));
+                    }
+                  }
+                });
+            }>"Save guild state"</button>
+            <span>{move || status.get()}</span>
+          </div>
+        </section>
 
-            <section>
-                <h2>"Connection test"</h2>
-                <div class="stack">
-                    <input node_ref=test_url_ref placeholder="http://127.0.0.1:8212" />
-                    <input node_ref=test_password_ref type="password" placeholder="Admin password" />
-                    <button on:click=move |_| {
-                        let Some(url_input) = test_url_ref.get() else {
-                            set_connection_status.set("Connection URL input is unavailable.".to_string());
-                            return;
-                        };
-                        let Some(password_input) = test_password_ref.get() else {
-                            set_connection_status.set("Connection password input is unavailable.".to_string());
-                            return;
-                        };
-                        let api_url = url_input.value();
-                        let admin_password = password_input.value();
-                        set_connection_status.set("Testing connection through the bot…".to_string());
-                        let set_connection_status = set_connection_status;
-                        spawn_local(async move {
-                            match test_connection(api_url, admin_password).await {
-                                Ok(response) if response.online => {
-                                    set_connection_status.set("Bot bridge test succeeded; the PalWorld server is reachable.".to_string());
-                                }
-                                Ok(_) => {
-                                    set_connection_status.set("Bot bridge test completed, but the PalWorld server did not respond successfully.".to_string());
-                                }
-                                Err(err) => {
-                                    set_connection_status.set(format!("Failed to test connection: {}", err));
-                                }
-                            }
-                        });
-                    }>"Test PalWorld connection"</button>
-                    <span>{move || connection_status.get()}</span>
-                </div>
-            </section>
-        </main>
+        <section>
+          <h2>"Connection test"</h2>
+          <div class="stack">
+            <input node_ref=test_url_ref placeholder="http://127.0.0.1:8212" />
+            <input node_ref=test_password_ref type="password" placeholder="Admin password" />
+            <button on:click=move |_| {
+              let Some(url_input) = test_url_ref.get() else {
+                set_connection_status.set("Connection URL input is unavailable.".to_string());
+                return;
+              };
+              let Some(password_input) = test_password_ref.get() else {
+                set_connection_status.set("Connection password input is unavailable.".to_string());
+                return;
+              };
+              let api_url = url_input.value();
+              let admin_password = password_input.value();
+              set_connection_status.set("Testing connection through the bot…".to_string());
+              let set_connection_status = set_connection_status;
+              spawn_local(async move {
+                match test_connection(api_url, admin_password).await {
+                  Ok(response) if response.online => {
+                    set_connection_status.set("Bot bridge test succeeded; the PalWorld server is reachable.".to_string());
+                  }
+                  Ok(_) => {
+                    set_connection_status.set("Bot bridge test completed, but the PalWorld server did not respond successfully.".to_string());
+                  }
+                  Err(err) => {
+                    set_connection_status.set(format!("Failed to test connection: {}", err));
+                  }
+                }
+              });
+            }>"Test PalWorld connection"</button>
+            <span>{move || connection_status.get()}</span>
+          </div>
+        </section>
+      </main>
     }
 }
 
